@@ -1,6 +1,6 @@
 {
   "name": "@vladmandic/lstm",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "LSTM: Time series analysis using machine learning long-short-term-memory",
   "sideEffects": false,
   "main": "dist/lstm.js",
