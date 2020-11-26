@@ -8,8 +8,8 @@ const log = require('@vladmandic/pilogger');
 let es;
 const banner = `
   /*
-  LTSM
-  homepage: <https://github.com/vladmandic/ltsm>
+  LSTM
+  homepage: <https://github.com/vladmandic/lstm>
   author: <https://github.com/vladmandic>'
   */
 `;
@@ -27,12 +27,12 @@ const common = {
 
 const targets = {
   browserBundle: {
-    ltsm: {
+    lstm: {
       platform: 'browser',
       format: 'esm',
-      metafile: 'dist/ltsm.json',
-      entryPoints: ['src/ltsm.js'],
-      outfile: 'dist/ltsm.js',
+      metafile: 'dist/lstm.json',
+      entryPoints: ['src/lstm.js'],
+      outfile: 'dist/lstm.js',
       external: ['fs', 'buffer', 'util'],
     },
   },

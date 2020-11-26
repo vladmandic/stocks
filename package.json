@@ -1,14 +1,14 @@
 {
-  "name": "@vladmandic/ltsm",
+  "name": "@vladmandic/lstm",
   "version": "0.0.1",
-  "description": "LTSM: Time series analysis using LTSM",
+  "description": "LSTM: Time series analysis using machine learning long-short-term-memory",
   "sideEffects": false,
-  "main": "dist/ltsm.js",
+  "main": "dist/lstm.js",
   "author": "Vladimir Mandic <mandic00@live.com>",
   "bugs": {
-    "url": "https://github.com/vladmandic/ltsm/issues"
+    "url": "https://github.com/vladmandic/lstm/issues"
   },
-  "homepage": "https://github.com/vladmandic/ltsm#readme",
+  "homepage": "https://github.com/vladmandic/lstm#readme",
   "license": "MIT",
   "engines": {
     "node": ">=14.0.0"
@@ -17,7 +17,9 @@
     "type": "git",
     "url": "git+https://github.com/vladmandic/ltsm.git"
   },
-  "dependencies": {},
+  "dependencies": {
+    "node-fetch": "^2.6.1"
+  },
   "peerDependencies": {},
   "devDependencies": {
     "@tensorflow/tfjs": "^2.7.0",
@@ -29,6 +31,7 @@
     "@tensorflow/tfjs-data": "^2.7.0",
     "@tensorflow/tfjs-layers": "^2.7.0",
     "@vladmandic/pilogger": "^0.2.9",
+    "plotly.js-dist": "^1.57.1",
     "chokidar": "^3.4.3",
     "dayjs": "^1.9.6",
     "esbuild": "^0.8.15",
@@ -43,13 +46,11 @@
   },
   "scripts": {
     "lint": "eslint src/*.js demo/*.js",
-    "dev": "npm install && node server/dev.js",
-    "build": "npm install && rimraf dist/* && node server/build.js",
-    "update": "npm update --depth 20 --force && npm dedupe && npm prune && npm audit"
+    "start": "node server/dev.js"
   },
   "keywords": [
     "tensorflowjs",
     "time-series",
-    "ltsm"
+    "lstm"
   ]
 }

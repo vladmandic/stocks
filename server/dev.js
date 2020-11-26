@@ -15,6 +15,7 @@ const zlib = require('zlib');
 const http2 = require('http2');
 const path = require('path');
 const chokidar = require('chokidar');
+const fetch = require('node-fetch');
 const log = require('@vladmandic/pilogger');
 const build = require('./build.js');
 
@@ -27,7 +28,7 @@ const options = {
   key: fs.readFileSync('server/https.key'),
   cert: fs.readFileSync('server/https.crt'),
   root: '..',
-  default: 'src/ltsm.html',
+  default: 'src/lstm.html',
   port: 8000,
   monitor: ['package.json', 'src'],
 };
@@ -89,39 +90,50 @@ function handle(url) {
 
 // process http requests
 async function httpRequest(req, res) {
-  handle(path.join(__dirname, options.root, req.url)).then((result) => {
-    // get original ip of requestor, regardless if it's behind proxy or not
-    const forwarded = (req.headers['forwarded'] || '').match(/for="\[(.*)\]:/);
-    const ip = (Array.isArray(forwarded) ? forwarded[1] : null) || req.headers['x-forwarded-for'] || req.ip || req.socket.remoteAddress;
-    if (!result || !result.ok) {
-      res.writeHead(404, { 'Content-Type': 'text/html' });
-      res.end('Error 404: Not Found\n', 'utf-8');
-      log.warn(`${req.method}/${req.httpVersion}`, res.statusCode, req.url, ip);
-    } else {
-      const ext = String(path.extname(result.file)).toLowerCase();
-      const contentType = mime[ext] || 'application/octet-stream';
-      const accept = req.headers['accept-encoding'] ? req.headers['accept-encoding'].includes('br') : false; // does target accept brotli compressed data
-      res.writeHead(200, {
-        // 'Content-Length': result.stat.size, // not using as it's misleading for compressed streams
-        'Content-Language': 'en', 'Content-Type': contentType, 'Content-Encoding': accept ? 'br' : '', 'Last-Modified': result.stat.mtime, 'Cache-Control': 'no-cache', 'X-Powered-By': `NodeJS/${process.version}`,
-      });
-      const compress = zlib.createBrotliCompress({ params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } }); // instance of brotli compression with level 5
-      const stream = fs.createReadStream(result.file);
-      if (!accept) stream.pipe(res); // don't compress data
-      else stream.pipe(compress).pipe(res); // compress data
-
-      // alternative methods of sending data
-      /// 2. read stream and send by chunk
-      // const stream = fs.createReadStream(result.file);
-      // stream.on('data', (chunk) => res.write(chunk));
-      // stream.on('end', () => res.end());
-
-      // 3. read entire file and send it as blob
-      // const data = fs.readFileSync(result.file);
-      // res.write(data);
-      log.data(`${req.method}/${req.httpVersion}`, res.statusCode, contentType, result.stat.size, req.url, ip);
-    }
-  });
+  // get original ip of requestor, regardless if it's behind proxy or not
+  const forwarded = (req.headers['forwarded'] || '').match(/for="\[(.*)\]:/);
+  const ip = (Array.isArray(forwarded) ? forwarded[1] : null) || req.headers['x-forwarded-for'] || req.ip || req.socket.remoteAddress;
+  if (req.url === '/cors') {
+    const url = req.headers['cors'];
+    const result = await fetch(url);
+    const json = (result && result.ok) ? await result.json() : {};
+    const serialize = JSON.stringify(json);
+    log.data(`${req.method}/${req.httpVersion}`, result.status, 'cors', serialize.length, url, ip);
+    res.writeHead(200, {
+      'Content-Language': 'en',
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'X-Powered-By': `NodeJS/${process.version}`,
+    });
+    res.write(serialize);
+    res.end();
+  } else {
+    handle(path.join(__dirname, options.root, req.url)).then((result) => {
+      if (!result || !result.ok) {
+        res.writeHead(404, { 'Content-Type': 'text/html' });
+        res.end('Error 404: Not Found\n', 'utf-8');
+        log.warn(`${req.method}/${req.httpVersion}`, res.statusCode, req.url, ip);
+      } else {
+        const ext = String(path.extname(result.file)).toLowerCase();
+        const contentType = mime[ext] || 'application/octet-stream';
+        const accept = req.headers['accept-encoding'] ? req.headers['accept-encoding'].includes('br') : false; // does target accept brotli compressed data
+        res.writeHead(200, {
+          // 'Content-Length': result.stat.size, // not using as it's misleading for compressed streams
+          'Content-Language': 'en',
+          'Content-Type': contentType,
+          'Content-Encoding': accept ? 'br' : '',
+          'Last-Modified': result.stat.mtime,
+          'Cache-Control': 'no-cache',
+          'X-Powered-By': `NodeJS/${process.version}`,
+        });
+        log.data(`${req.method}/${req.httpVersion}`, res.statusCode, contentType, result.stat.size, req.url, ip);
+        const compress = zlib.createBrotliCompress({ params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } }); // instance of brotli compression with level 5
+        const stream = fs.createReadStream(result.file);
+        if (!accept) stream.pipe(res); // don't compress data
+        else stream.pipe(compress).pipe(res); // compress data
+      }
+    });
+  }
 }
 
 // app main entry point
