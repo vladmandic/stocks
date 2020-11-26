@@ -1,0 +1,12 @@
+{
+  "name": "LTSM",
+  "short_name": "LTSM",
+  "icons": [
+    { "src": "assets/icon.png", "sizes": "853x853", "type": "image/png", "purpose": "any maskable" }
+    ],
+  "start_url": "src/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000"
+}

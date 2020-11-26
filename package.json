@@ -1,0 +1,55 @@
+{
+  "name": "@vladmandic/ltsm",
+  "version": "0.0.1",
+  "description": "LTSM: Time series analysis using LTSM",
+  "sideEffects": false,
+  "main": "dist/ltsm.js",
+  "author": "Vladimir Mandic <mandic00@live.com>",
+  "bugs": {
+    "url": "https://github.com/vladmandic/ltsm/issues"
+  },
+  "homepage": "https://github.com/vladmandic/ltsm#readme",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vladmandic/ltsm.git"
+  },
+  "dependencies": {},
+  "peerDependencies": {},
+  "devDependencies": {
+    "@tensorflow/tfjs": "^2.7.0",
+    "@tensorflow/tfjs-backend-cpu": "^2.7.0",
+    "@tensorflow/tfjs-backend-wasm": "^2.7.0",
+    "@tensorflow/tfjs-backend-webgl": "^2.7.0",
+    "@tensorflow/tfjs-converter": "^2.7.0",
+    "@tensorflow/tfjs-core": "^2.7.0",
+    "@tensorflow/tfjs-data": "^2.7.0",
+    "@tensorflow/tfjs-layers": "^2.7.0",
+    "@vladmandic/pilogger": "^0.2.9",
+    "chokidar": "^3.4.3",
+    "dayjs": "^1.9.6",
+    "esbuild": "^0.8.15",
+    "eslint": "^7.14.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-json": "^2.1.2",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "rimraf": "^3.0.2",
+    "seedrandom": "^3.0.5"
+  },
+  "scripts": {
+    "lint": "eslint src/*.js demo/*.js",
+    "dev": "npm install && node server/dev.js",
+    "build": "npm install && rimraf dist/* && node server/build.js",
+    "update": "npm update --depth 20 --force && npm dedupe && npm prune && npm audit"
+  },
+  "keywords": [
+    "tensorflowjs",
+    "time-series",
+    "ltsm"
+  ]
+}
