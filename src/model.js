@@ -45,9 +45,7 @@ async function trainModel(X, Y, window_size, n_epochs, learning_rate, n_layers, 
     { batchSize: rnn_batch_size,
       epochs: n_epochs,
       callbacks: {
-        onEpochEnd: async (epoch, log) => {
-          callback(epoch, log);
-        },
+        onEpochEnd: async (epoch, log) => callback(epoch, log),
       },
     });
 
