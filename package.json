@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vladmandic/ltsm.git"
+    "url": "git+https://github.com/vladmandic/lstm.git"
   },
   "dependencies": {
     "node-fetch": "^2.6.1"
