@@ -1,3 +1,5 @@
+/* global tf */
+
 async function trainModel(X, Y, window_size, n_epochs, learning_rate, n_layers, callback) {
   const input_layer_shape = window_size;
   const input_layer_neurons = 100;

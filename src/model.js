@@ -1,60 +1,64 @@
 import * as tf from '@tensorflow/tfjs';
 
-async function trainModel(X, Y, window_size, n_epochs, learning_rate, n_layers, callback) {
-  const input_layer_shape = window_size;
-  const input_layer_neurons = 100;
-
-  const rnn_input_layer_features = 10;
-  const rnn_input_layer_timesteps = input_layer_neurons / rnn_input_layer_features;
-
-  const rnn_input_shape = [rnn_input_layer_features, rnn_input_layer_timesteps];
-  const rnn_output_neurons = 20;
-
-  const rnn_batch_size = window_size;
-
-  const output_layer_shape = rnn_output_neurons;
-  const output_layer_neurons = 1;
-
+async function train(input, output, params, callback) {
+  // console.log('Training:', params, input, output);
   const model = tf.sequential();
 
-  const xs = tf.tensor2d(X, [X.length, X[0].length]).div(tf.scalar(10));
-  const ys = tf.tensor2d(Y, [Y.length, 1]).reshape([Y.length, 1]).div(tf.scalar(10));
+  const max = Math.max(...output);
+  const mul = 255;
+  const inputT = params.dtype === 'int'
+    ? tf.tidy(() => tf.tensor2d(input, [input.length, params.windowSize]).div(max).mul(mul).toInt())
+    : tf.tidy(() => tf.tensor2d(input, [input.length, params.windowSize]).div(max));
+  const outputT = params.dtype === 'int'
+    ? tf.tidy(() => tf.tensor2d(output, [output.length, 1]).div(max).mul(mul).toInt())
+    : tf.tidy(() => tf.tensor2d(output, [output.length, 1]).div(max));
 
-  model.add(tf.layers.dense({ units: input_layer_neurons, inputShape: [input_layer_shape] }));
-  model.add(tf.layers.reshape({ targetShape: rnn_input_shape }));
-
-  const lstm_cells = [];
-  for (let index = 0; index < n_layers; index++) {
-    lstm_cells.push(tf.layers.lstmCell({ units: rnn_output_neurons }));
+  // model definition
+  model.add(tf.layers.dense({ units: params.neurons, inputShape: [params.windowSize] }));
+  model.add(tf.layers.reshape({ targetShape: [params.features, Math.trunc(params.neurons / params.features)] }));
+  const cell = [];
+  for (let index = 0; index < params.layers; index++) {
+    cell.push(tf.layers.lstmCell({
+      units: params.windowSize,
+    }));
   }
-
   model.add(tf.layers.rnn({
-    cell: lstm_cells,
-    inputShape: rnn_input_shape,
+    cell,
+    inputShape: [params.features, Math.trunc(params.neurons / params.features)],
     returnSequences: false,
   }));
-
-  model.add(tf.layers.dense({ units: output_layer_neurons, inputShape: [output_layer_shape] }));
-
+  model.add(tf.layers.dense({
+    units: 1,
+    inputShape: [params.windowSize],
+  }));
+  // compile model
   model.compile({
-    optimizer: tf.train.adam(learning_rate),
-    loss: 'meanSquaredError',
+    optimizer: tf.train.adam(params.learningRate),
+    loss: params.loss,
   });
-
-  const hist = await model.fit(xs, ys,
-    { batchSize: rnn_batch_size,
-      epochs: n_epochs,
-      callbacks: {
-        onEpochEnd: async (epoch, log) => callback(epoch, log),
-      },
+  // execute fit with callback
+  const stats = await model.fit(inputT, outputT,
+    { batchSize: params.windowSize,
+      epochs: params.epochs,
+      callbacks: { onEpochEnd: (epoch, logs) => callback(epoch, logs) },
     });
-
-  return { model, stats: hist };
+  stats.factor = max;
+  stats.multiplier = mul;
+  stats.dtype = params.dtype;
+  inputT.dispose();
+  outputT.dispose();
+  return { model, stats };
 }
 
-function makePredictions(X, model) {
-  const predictedResults = model.predict(tf.tensor2d(X, [X.length, X[0].length]).div(tf.scalar(10))).mul(10);
-  return Array.from(predictedResults.dataSync());
+async function predict(X, model) {
+  const inputT = model.stats.dtype === 'int'
+    ? tf.tidy(() => tf.tensor2d(X, [X.length, X[0].length]).div(model.stats.factor).mul(model.stats.multiplier).toInt())
+    : tf.tidy(() => tf.tensor2d(X, [X.length, X[0].length]).div(model.stats.factor));
+  const outputT = model.model.predict(inputT);
+  const output = outputT.dataSync().map((val) => val * model.stats.factor);
+  inputT.dispose();
+  outputT.dispose();
+  return output[0];
 }
 
-export { trainModel, makePredictions };
+export { train, predict };

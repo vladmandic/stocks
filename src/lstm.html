@@ -16,13 +16,17 @@
     <script src="../dist/lstm.js"></script>
     <style>
       /* @font-face { font-family: 'FA'; font-display: swap; font-style: normal; font-weight: 900; src: local('FA'), url('../assets/fa-solid-900.woff2'); } */
-      html { font-family: 'system-ui'; font-size: 16px; }
+      html { font-family: 'system-ui'; font-size: 14px; }
       body { margin: 0; background: black; color: white; overflow-x: hidden; scrollbar-width: none; }
     </style>
   </head>
   <body>
-    <div id="graph" style="width:100vw; height:80vh;"></div>
-    <div id="log" style="height: 18vh; margin: 0.5rem; position: fixed; bottom: 0;"></div>
+    <div id="graph" style="width:100vw; height:50vh;"></div>
+    <div style="display: flex">
+      <div id="params" style="width:50vw; height:20vh; margin: 0.5rem;"></div>
+      <div id="train" style="width:50vw; height:20vh;"></div>
+    </div>
+    <div id="log" style="height: 10vh; width: 100vw; overflow-y: auto; margin: 0.5rem; position: fixed; bottom: 0;"></div>
   </body>
 </html>
 
