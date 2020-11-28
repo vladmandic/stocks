@@ -16,10 +16,10 @@ const stock = {
 const params = {
   epochs: 10,
   learningRate: 0.025,
-  layers: 3,
+  layers: 2,
   inputWindow: 15,
   outputWindow: 1,
-  predictWindow: 15,
+  predictWindow: 20,
   neurons: 30,
   features: 5,
   dtype: 'float32',
@@ -210,8 +210,17 @@ async function getData() {
 async function trainModel(input) {
   if (!input) return;
   // log('Train:', params);
+
   const inputs = computeMA(input, params.inputWindow).map((val) => val['set']);
+  // 1. map set of inputs to current ma
   const outputs = computeMA(input, params.outputWindow).map((val) => val['set']).slice(params.inputWindow - params.outputWindow, data.adjusted.length);
+
+  // 2. map set of inputs to current val
+  // const outputs = input.slice(params.inputWindow - params.outputWindow, data.adjusted.length);
+
+  // 3. map set of inputs to future val
+  // inputs.shift();
+  // const outputs = input.slice(params.inputWindow - params.outputWindow + 1, data.adjusted.length);
 
   // train graph
   const lossData = [{
@@ -220,35 +229,35 @@ async function trainModel(input) {
     name: 'Epoch',
     type: 'bar',
     texttemplate: '%{value:,.2r}',
-    textposition: 'inside',
+    textposition: 'outside',
     line: { color: 'lightblue', width: 3 },
   }];
   for (let i = 0; i <= params.epochs; i++) {
     lossData[0].x.push(i);
     lossData[0].y.push(0);
   }
+  const lossLayout = {
+    xaxis: { type: 'scatter', autorange: false, range: [0, params.epochs + 1], dtick: 1, visible: false },
+    margin: { l: 0, r: 0, t: 40, b: 0 },
+  };
+  let ms = performance.now();
 
   // training callback on each epoch end
-  let ms = performance.now();
-  const maxPrice = Math.max(...data.adjusted);
-  async function callback(epoch, logs) {
-    lossData[0].y[epoch + 1] = params.dtype === 'int32' ? (maxPrice * logs.loss / (255 ** 2)) : (maxPrice * logs.loss);
-    const title = epoch === params.epochs ? `Training complete: ${ms.toLocaleString()} ms Loss: ${Math.trunc(1000 * lossData[0].y[epoch]) / 1000}` : `Training: ${Math.trunc(100 * (epoch + 1) / params.epochs)}%`;
-    const lossLayout = {
-      xaxis: { type: 'scatter', autorange: false, range: [0, params.epochs + 1], dtick: 1, visible: false },
-      yaxis: { tickprefix: '', autorange: false, range: [0, Math.max(...lossData[0].y)], visible: false },
-      title,
-    };
-    Plotly.newPlot(document.getElementById('train'), lossData, { ...chart.layout, ...lossLayout }, chart.options);
+  async function callback(epoch, loss) {
+    if (!Number.isNaN(loss)) {
+      lossData[0].y[epoch + 1] = loss;
+      lossLayout.yaxis = { tickprefix: '', autorange: false, range: [0, 1.2 * Math.max(...lossData[0].y)], visible: false };
+      lossLayout.title = epoch === params.epochs ? `Training complete: ${ms.toLocaleString()} ms Loss: ${lossData[0].y[epoch]}` : `Training: ${Math.trunc(100 * (epoch + 1) / params.epochs)}%`;
+      Plotly.newPlot(document.getElementById('train'), lossData, { ...chart.layout, ...lossLayout }, chart.options);
+    }
   }
 
-  // init loss graph
-  await callback(-1, { loss: 0 });
   // train
+  await callback(0, 0);
   trained = await model.train(inputs, outputs, params, callback);
   ms = performance.now() - ms;
-  await callback(params.epochs, { loss: 0 });
-  advice(ok(lossData[0].y[params.epochs] < (params.dtype === 'int32' ? 10 : 0.1)), `Final loss: ${Math.trunc(1000 * lossData[0].y[params.epochs]) / 1000}`);
+  await callback(params.epochs, 0);
+  advice(ok(lossData[0].y[params.epochs] < (params.dtype === 'int32' ? 10 : 0.05)), `Final loss: ${lossData[0].y[params.epochs]}`);
 }
 
 async function validateModel(input, title) {
@@ -265,7 +274,7 @@ async function validateModel(input, title) {
   }];
   let pt = 0;
   while (pt < inputs.length) {
-    const predictions = await model.predict([inputs[pt]], trained);
+    const predictions = await model.predict(trained, inputs[pt]);
     for (let i = 0; i < predictions.length; i++) {
       validationData[0].x[pt] = data.time[pt + params.inputWindow - params.outputWindow + i];
       validationData[0].y[pt] = predictions[i];
@@ -273,12 +282,13 @@ async function validateModel(input, title) {
     pt += predictions.length;
   }
   let distance = 0;
+  const max = Math.max(...validationData[0].y);
   for (pt = 0; pt < inputs.length; pt++) {
-    distance += (validationData[0].y[pt] - outputs[pt]) ** 2;
+    distance += (((validationData[0].y[pt] - outputs[pt]) / max) ** 2) || 0;
   }
   distance = Math.trunc(Math.sqrt(distance) / inputs.length * 1000) / 1000;
-  if (distance < 1) Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
-  advice(ok(distance < 1), `Model fit distance: ${distance}`);
+  if (distance < 0.1) Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
+  advice(ok(distance < 0.1), `Model fit distance: ${distance}`);
 }
 
 async function predictModel(input, title) {
@@ -300,7 +310,7 @@ async function predictModel(input, title) {
   let pt = 0;
   let correction = 0;
   while (pt < params.predictWindow) {
-    const predictions = await model.predict([last], trained);
+    const predictions = await model.predict(trained, last);
     if (pt === 0) correction = predictions[0] - input[input.length - 1];
     for (let i = 0; i < predictions.length; i++) {
       predictionData[0].x[pt] = data.time[data.time.length - 1] + (pt * step) + (i * step);
@@ -312,7 +322,7 @@ async function predictModel(input, title) {
   }
   Plotly.plot(document.getElementById('graph'), predictionData, chart.layout, chart.options);
   const perc = Math.trunc(100 * Math.abs(correction / input[input.length - 1])) / 100;
-  advice(ok(perc < 0.1), `Correction to SMA: ${perc}`);
+  advice(ok(perc < 0.1), `Predict correction to SMA: ${perc}`);
 }
 
 async function initTFJS() {
