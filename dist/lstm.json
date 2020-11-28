@@ -17823,7 +17823,7 @@
       ]
     },
     "src/lstm.js": {
-      "bytes": 11718,
+      "bytes": 14726,
       "imports": [
         {
           "path": "node_modules/plotly.js-dist/plotly.js"
@@ -17843,11 +17843,11 @@
       ]
     },
     "src/menu.js": {
-      "bytes": 14489,
+      "bytes": 14436,
       "imports": []
     },
     "src/model.js": {
-      "bytes": 2281,
+      "bytes": 2760,
       "imports": [
         {
           "path": "node_modules/@tensorflow/tfjs/dist/index.js"
@@ -17883,14 +17883,14 @@
     "dist/lstm.js.map": {
       "imports": [],
       "inputs": {},
-      "bytes": 12073496
+      "bytes": 12070302
     },
     "dist/lstm.js": {
       "imports": [],
       "exports": [],
       "inputs": {
         "node_modules/plotly.js-dist/plotly.js": {
-          "bytesInOutput": 4702015
+          "bytesInOutput": 4702060
         },
         "empty:/home/vlado/dev/lstm/node_modules/node-fetch/browser.js": {
           "bytesInOutput": 34
@@ -17989,7 +17989,7 @@
           "bytesInOutput": 25549
         },
         "src/lstm.js": {
-          "bytesInOutput": 8079
+          "bytesInOutput": 10956
         },
         "node_modules/@tensorflow/tfjs-core/dist/backends/backend.js": {
           "bytesInOutput": 9404
@@ -20974,13 +20974,13 @@
           "bytesInOutput": 0
         },
         "src/model.js": {
-          "bytesInOutput": 1805
+          "bytesInOutput": 1937
         },
         "src/menu.js": {
-          "bytesInOutput": 12356
+          "bytesInOutput": 12303
         }
       },
-      "bytes": 6068397
+      "bytes": 6071397
     }
   }
 }

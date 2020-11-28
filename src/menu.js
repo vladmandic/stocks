@@ -2,9 +2,9 @@ let instance = 0;
 let CSScreated = false;
 
 let theme = {
-  background: '#444444',
+  background: '#222222',
   hover: 'lightgray',
-  itemBackground: 'black',
+  itemBackground: '#555555',
   itemColor: 'white',
   buttonBackground: 'lightblue',
   buttonHover: 'lightgreen',
@@ -20,9 +20,8 @@ function createCSS() {
   const css = `
   :root { --rounded: 0.2rem; }
   .menu { position: absolute; top: 0rem; right: 0; width: max-content; padding: 0 0.2rem 0 0.2rem; line-height: 1.8rem; z-index: 10;
-          background: ${theme.background}; border-radius: var(--rounded); border-color: black; border-style: solid; border-width: thin; }
+          background: ${theme.background}; border-radius: var(--rounded); border-color: black; border-style: none; border-width: thin; }
 
-  .menu:hover { box-shadow: 0 0 8px ${theme.hover}; }
   .menu-container { display: block; max-height: 100vh; }
   .menu-container-fadeout { max-height: 0; overflow: hidden; transition: max-height, 0.5s ease; }
   .menu-container-fadein { max-height: 100vh; overflow: hidden; transition: max-height, 0.5s ease; }
