@@ -18,7 +18,7 @@ let theme = {
 function createCSS() {
   if (CSScreated) return;
   const css = `
-  :root { --rounded: 0.2rem; }
+  :root { --rounded: 0.1rem; }
   .menu { position: absolute; top: 0rem; right: 0; width: max-content; padding: 0 0.2rem 0 0.2rem; line-height: 1.8rem; z-index: 10;
           background: ${theme.background}; border-radius: var(--rounded); border-color: black; border-style: none; border-width: thin; }
 

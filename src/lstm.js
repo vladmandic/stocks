@@ -15,13 +15,20 @@ const stock = {
 
 const params = {
   epochs: 10,
-  learningRate: 0.025,
-  layers: 2,
+  learningRate: 0.005,
+  layers: 1,
   inputWindow: 15,
   outputWindow: 1,
-  predictWindow: 20,
+  predictWindow: 30,
   neurons: 30,
-  features: 5,
+  features: 10,
+  forgetBias: false,
+  kernelInitializer: 'leCunNormal',
+  recurrentActivation: 'relu',
+  activation: 'tanh',
+  loss: 'meanSquaredError',
+  validationSplit: 0.1,
+  shuffle: false,
   dtype: 'float32',
   backend: 'webgl',
 };
@@ -97,7 +104,7 @@ function str(...msg) {
   if (!Array.isArray(msg)) return msg;
   let line = '';
   for (const entry of msg) {
-    if (typeof entry === 'object') line += JSON.stringify(entry).replace(/{|}|"|\[|\]/g, '').replace(/,/g, ' ');
+    if (typeof entry === 'object') line += JSON.stringify(entry).replace(/{|}|"|\[|\]/g, '').replace(/,/g, ' | ');
     else line += entry;
   }
   return line;
@@ -113,7 +120,7 @@ function log(...msg) {
   // eslint-disable-next-line no-console
   console.log(ts, ...msg);
   const div = document.getElementById('log');
-  div.innerHTML += `${ts} &nbsp ${str(msg)}<br>`;
+  div.innerHTML += `<font color=gray>${ts}</font> &nbsp ${str(msg)}<br>`;
   div.scrollTop = div.scrollHeight;
 }
 
@@ -123,18 +130,17 @@ function advice(...msg) {
   div.scrollTop = div.scrollHeight;
 }
 
-function computeMA(raw, windowSize) {
-  const avg = [];
-  for (let i = 0; i <= raw.length - windowSize; i++) {
-    let ma = 0.00;
-    const t = i + windowSize;
-    for (let k = i; k < t && k <= raw.length; k++) {
-      ma += raw[k] / windowSize;
+function computeSMA(input, windowSize) {
+  const arr = [];
+  for (let i = windowSize; i < input.length; i++) {
+    const set = [];
+    for (let j = 1; j <= windowSize; j++) {
+      set.push(input[i - j]);
     }
-    const set = raw.slice(i, i + windowSize);
-    avg.push({ set, ma });
+    const ma = set.reduce((sum, val) => sum += val, 0) / windowSize;
+    arr.push({ val: input[i], set, ma });
   }
-  return avg;
+  return arr;
 }
 
 async function drawGraph() {
@@ -150,9 +156,9 @@ async function drawGraph() {
     line: { color: 'lightblue', shape: 'spline', width: 3 },
   });
   chart.data.push({
-    name: 'MA: 30',
-    x: data.time.slice(30 / 2).concat(data.time),
-    y: computeMA(data.adjusted, 30).map((val) => val.ma),
+    name: 'SMA: 30',
+    x: data.time.slice(30 / 2),
+    y: computeSMA(data.adjusted, 30).map((val) => val.ma),
     type: 'lines',
     line: { color: '#888888', opacity: 0.5, shape: 'spline' },
   });
@@ -168,7 +174,7 @@ async function drawGraph() {
   chart.data.push({
     name: 'Volume',
     x: data.time,
-    y: data.volume.map((val) => maxPrice * val / maxVolume / 5),
+    y: data.volume.map((val) => maxPrice * val / maxVolume / 2),
     type: 'bar',
     marker: { color: 'steelblue' },
   });
@@ -209,19 +215,11 @@ async function getData() {
 
 async function trainModel(input) {
   if (!input) return;
-  // log('Train:', params);
+  advice('Training', params);
 
-  const inputs = computeMA(input, params.inputWindow).map((val) => val['set']);
-  // 1. map set of inputs to current ma
-  const outputs = computeMA(input, params.outputWindow).map((val) => val['set']).slice(params.inputWindow - params.outputWindow, data.adjusted.length);
-
-  // 2. map set of inputs to current val
-  // const outputs = input.slice(params.inputWindow - params.outputWindow, data.adjusted.length);
-
-  // 3. map set of inputs to future val
-  // inputs.shift();
-  // const outputs = input.slice(params.inputWindow - params.outputWindow + 1, data.adjusted.length);
-
+  const ma = computeSMA(input, params.inputWindow);
+  const inputs = ma.map((val) => val.set);
+  const outputs = ma.map((val) => val.val);
   // train graph
   const lossData = [{
     x: [],
@@ -243,7 +241,7 @@ async function trainModel(input) {
   let ms = performance.now();
 
   // training callback on each epoch end
-  async function callback(epoch, loss) {
+  function callback(epoch, loss) {
     if (!Number.isNaN(loss)) {
       lossData[0].y[epoch + 1] = loss;
       lossLayout.yaxis = { tickprefix: '', autorange: false, range: [0, 1.2 * Math.max(...lossData[0].y)], visible: false };
@@ -253,30 +251,41 @@ async function trainModel(input) {
   }
 
   // train
-  await callback(0, 0);
   trained = await model.train(inputs, outputs, params, callback);
   ms = performance.now() - ms;
-  await callback(params.epochs, 0);
-  advice(ok(lossData[0].y[params.epochs] < (params.dtype === 'int32' ? 10 : 0.05)), `Final loss: ${lossData[0].y[params.epochs]}`);
+  callback(params.epochs, -1);
+  /*
+  const layers = [];
+  for (const layer of trained.model.layers) {
+    // eslint-disable-next-line no-console
+    console.log('Layer:', layer);
+    if (layer.cell) layers.push({ cell: layer.cell.cells.map((val) => val.name) });
+    layers.push({ name: layer.name, shape: layer.outputShape });
+  }
+  log('Model', layers);
+  console.log('Model summary:', trained.model.summary());
+  */
+  advice(ok(trained.stats.eval < 0.01), `Model evaluation: ${trained.stats.eval}`);
+  log('Engine', tf.engine().memory());
 }
 
 async function validateModel(input, title) {
   if (!trained || !trained.model) return;
-  const inputs = computeMA(data.adjusted, params.inputWindow).map((val) => val['set']);
-  const outputs = computeMA(data.adjusted, params.outputWindow).map((val) => val['ma']);
+  const ma = computeSMA(data.adjusted, params.inputWindow);
+  const inputs = ma.map((val) => val.set);
+  const outputs = ma.map((val) => val.val);
   // validate
   const validationData = [{
-    x: [],
+    x: data.time.slice(params.inputWindow - 1),
     y: [],
     name: title,
     type: 'lines',
-    line: { color: 'lightcoral', shape: 'spline', width: 2, opacity: 0.5 },
+    line: { color: 'lightcoral', shape: 'spline', width: 2, opacity: 0.2 },
   }];
   let pt = 0;
   while (pt < inputs.length) {
     const predictions = await model.predict(trained, inputs[pt]);
     for (let i = 0; i < predictions.length; i++) {
-      validationData[0].x[pt] = data.time[pt + params.inputWindow - params.outputWindow + i];
       validationData[0].y[pt] = predictions[i];
     }
     pt += predictions.length;
@@ -284,11 +293,11 @@ async function validateModel(input, title) {
   let distance = 0;
   const max = Math.max(...validationData[0].y);
   for (pt = 0; pt < inputs.length; pt++) {
-    distance += (((validationData[0].y[pt] - outputs[pt]) / max) ** 2) || 0;
+    distance += (((validationData[0].y[pt] - (outputs[pt]) / max)) ** 2) || 0;
   }
-  distance = Math.trunc(Math.sqrt(distance) / inputs.length * 1000) / 1000;
-  if (distance < 0.1) Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
-  advice(ok(distance < 0.1), `Model fit distance: ${distance}`);
+  distance = Math.trunc(10000 * Math.sqrt(distance) / inputs.length) / 10000;
+  if (distance < 10) Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
+  advice(ok(distance < 10), `Model fit distance: ${distance}`);
 }
 
 async function predictModel(input, title) {
@@ -322,7 +331,7 @@ async function predictModel(input, title) {
   }
   Plotly.plot(document.getElementById('graph'), predictionData, chart.layout, chart.options);
   const perc = Math.trunc(100 * Math.abs(correction / input[input.length - 1])) / 100;
-  advice(ok(perc < 0.1), `Predict correction to SMA: ${perc}`);
+  advice(ok(perc < 0.2), `Predict correction to SMA: ${perc}`);
 }
 
 async function initTFJS() {
@@ -360,19 +369,21 @@ async function createMenu() {
   menu1.addList('Range', ['1d', '5d', '1mo', '3mo', '1y', '2y'], stock.range, (val) => stock.range = val);
 
   const menu2 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 200}px` });
-  menu2.addRange('Epochs', params, 'epochs', 1, 50, 1, (val) => params.epochs = parseInt(val));
-  menu2.addRange('Layers', params, 'layers', 1, 10, 1, (val) => params.layers = parseInt(val));
-  menu2.addRange('Input window', params, 'inputWindow', 1, 100, 1, (val) => params.inputWindow = parseInt(val));
-  menu2.addRange('Output window', params, 'outputWindow', 1, 100, 1, (val) => params.outputWindow = parseInt(val));
-  menu2.addRange('Predict window', params, 'predictWindow', 1, 100, 1, (val) => params.predictWindow = parseInt(val));
-  menu2.addRange('Neurons', params, 'neurons', 1, 100, 1, (val) => params.neurons = parseInt(val));
-  menu2.addRange('Features', params, 'features', 1, 100, 1, (val) => params.features = parseInt(val));
-  menu2.addRange('Learning rate', params, 'learningRate', 0.01, 1, 0.01, (val) => params.learningRate = parseFloat(val));
   menu2.addButton('Train Model', 'Train Model', async () => {
     if (!data || !data.adjusted) return;
     await trainModel(data.adjusted);
     await validateModel(data.adjusted, 'Model fit');
   });
+  menu2.addRange('Input window', params, 'inputWindow', 1, 100, 1, (val) => params.inputWindow = parseInt(val));
+  // menu2.addRange('Output window', params, 'outputWindow', 1, 100, 1, (val) => params.outputWindow = parseInt(val));
+  menu2.addRange('Neurons', params, 'neurons', 1, 100, 1, (val) => params.neurons = parseInt(val));
+  menu2.addRange('Features', params, 'features', 1, 100, 1, (val) => params.features = parseInt(val));
+  menu2.addRange('LSTM layers', params, 'layers', 1, 10, 1, (val) => params.layers = parseInt(val));
+  menu2.addRange('Training epochs', params, 'epochs', 1, 50, 1, (val) => params.epochs = parseInt(val));
+  menu2.addRange('Validation split', params, 'validationSplit', 0.1, 0.9, 0.1, (val) => params.validationSplit = parseFloat(val));
+  menu2.addRange('Learning rate', params, 'learningRate', 0.005, 1, 0.01, (val) => params.learningRate = parseFloat(val));
+  menu2.addBool('Forget bias', params, 'forgetBias', (val) => params.forgetBias = val);
+  menu2.addBool('Shuffle data', params, 'shuffle', (val) => params.shuffle = val);
   menu2.addButton('Run Inference', 'Run Inference', async () => {
     if (!data || !data.adjusted) return;
     await predictModel(data.adjusted, 'Predict');
@@ -381,6 +392,7 @@ async function createMenu() {
     // await predictModel(data.low, 'Predict: Low');
     // await predictModel(data.close, 'Predict: Close');
   });
+  menu2.addRange('Predict window', params, 'predictWindow', 1, 100, 1, (val) => params.predictWindow = parseInt(val));
 }
 
 async function main() {

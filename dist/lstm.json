@@ -17823,7 +17823,7 @@
       ]
     },
     "src/lstm.js": {
-      "bytes": 15008,
+      "bytes": 15340,
       "imports": [
         {
           "path": "node_modules/plotly.js-dist/plotly.js"
@@ -17847,7 +17847,7 @@
       "imports": []
     },
     "src/model.js": {
-      "bytes": 3184,
+      "bytes": 3948,
       "imports": [
         {
           "path": "node_modules/@tensorflow/tfjs/dist/index.js"
@@ -17883,7 +17883,7 @@
     "dist/lstm.js.map": {
       "imports": [],
       "inputs": {},
-      "bytes": 12071379
+      "bytes": 12073221
     },
     "dist/lstm.js": {
       "imports": [],
@@ -17989,7 +17989,7 @@
           "bytesInOutput": 25549
         },
         "src/lstm.js": {
-          "bytesInOutput": 10921
+          "bytesInOutput": 11087
         },
         "node_modules/@tensorflow/tfjs-core/dist/backends/backend.js": {
           "bytesInOutput": 9404
@@ -20974,13 +20974,13 @@
           "bytesInOutput": 0
         },
         "src/model.js": {
-          "bytesInOutput": 2136
+          "bytesInOutput": 2659
         },
         "src/menu.js": {
           "bytesInOutput": 12303
         }
       },
-      "bytes": 6071561
+      "bytes": 6072250
     }
   }
 }
