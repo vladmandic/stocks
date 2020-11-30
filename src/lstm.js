@@ -1,4 +1,4 @@
-import Plotly from 'plotly.js-dist';
+import Plotly from 'plotly.js-dist'; // <https://plotly.com/javascript/>
 import * as tf from '@tensorflow/tfjs';
 import * as wasm from '@tensorflow/tfjs-backend-wasm';
 import * as model from './model.js';
@@ -10,24 +10,25 @@ let trained;
 const stock = {
   symbol: 'dell',
   interval: '1d', // validIntervals:[1m,2m,5m,15m,30m,60m,90m,1h,1d,5d,1wk,1mo,3mo]
-  range: '2y', // validRanges:[1d,5d,1mo,3mo,6mo,1y,2y,5y]
+  range: '1y', // validRanges:[1d,5d,1mo,3mo,6mo,1y,2y,5y]
 };
 
 const params = {
-  epochs: 10,
-  learningRate: 0.005,
+  epochs: 20,
+  learningRate: 0.001,
   layers: 1,
-  inputWindow: 15,
+  inputWindow: 30,
   outputWindow: 1,
-  predictWindow: 30,
-  neurons: 30,
+  predictWindow: 60,
+  neurons: 40,
   features: 10,
   forgetBias: false,
+  // biasInitializer: 'leCunNormal',
   kernelInitializer: 'leCunNormal',
   recurrentActivation: 'relu',
-  activation: 'tanh',
+  // activation: 'tanh',
   loss: 'meanSquaredError',
-  validationSplit: 0.1,
+  validationSplit: 0.2,
   shuffle: false,
   dtype: 'float32',
   backend: 'webgl',
@@ -130,15 +131,20 @@ function advice(...msg) {
   div.scrollTop = div.scrollHeight;
 }
 
-function computeSMA(input, windowSize) {
+function computeSMA(input, inputWindow, outputWindow = 1) {
   const arr = [];
-  for (let i = windowSize; i < input.length; i++) {
-    const set = [];
-    for (let j = 1; j <= windowSize; j++) {
-      set.push(input[i - j]);
+  for (let i = inputWindow; i <= (input.length - outputWindow); i++) {
+    const inputSet = []; // history: create set of values up to index
+    for (let j = inputWindow; j >= 1; j--) inputSet.push(input[i - j]);
+    let outputSet = []; // future
+    if (outputWindow === 1) { // outputSet is single value
+      outputSet = input[i];
+    } else { // create set of values starting with index
+      for (let j = i; j < (i + outputWindow); j++) outputSet.push(input[j]);
     }
-    const ma = set.reduce((sum, val) => sum += val, 0) / windowSize;
-    arr.push({ val: input[i], set, ma });
+    const sma = inputSet.reduce((sum, val) => sum += val, 0) / inputWindow;
+    const value = input[i];
+    arr.push({ value, sma, inputSet, outputSet });
   }
   return arr;
 }
@@ -154,13 +160,6 @@ async function drawGraph() {
     y: data.adjusted,
     type: 'lines',
     line: { color: 'lightblue', shape: 'spline', width: 3 },
-  });
-  chart.data.push({
-    name: 'SMA: 30',
-    x: data.time.slice(30 / 2),
-    y: computeSMA(data.adjusted, 30).map((val) => val.ma),
-    type: 'lines',
-    line: { color: '#888888', opacity: 0.5, shape: 'spline' },
   });
   chart.data.push({
     name: 'OHLC',
@@ -217,9 +216,9 @@ async function trainModel(input) {
   if (!input) return;
   advice('Training', params);
 
-  const ma = computeSMA(input, params.inputWindow);
-  const inputs = ma.map((val) => val.set);
-  const outputs = ma.map((val) => val.val);
+  const ma = computeSMA(input, params.inputWindow, params.outputWindow);
+  const inputs = ma.map((val) => val.inputSet);
+  const outputs = ma.map((val) => val.outputSet);
   // train graph
   const lossData = [{
     x: [],
@@ -246,10 +245,13 @@ async function trainModel(input) {
       lossData[0].y[epoch + 1] = loss;
       lossLayout.yaxis = { tickprefix: '', autorange: false, range: [0, 1.2 * Math.max(...lossData[0].y)], visible: false };
       lossLayout.title = epoch === params.epochs ? `Training complete: ${ms.toLocaleString()} ms Loss: ${lossData[0].y[epoch]}` : `Training: ${Math.trunc(100 * (epoch + 1) / params.epochs)}%`;
-      Plotly.newPlot(document.getElementById('train'), lossData, { ...chart.layout, ...lossLayout }, chart.options);
+      Plotly.newPlot(document.getElementById('train'), lossData, { ...chart.layout, ...lossLayout }, { ...chart.options, displayModeBar: false });
     }
   }
 
+  // dispose previous model (still leaking 8 tensors)
+  if (trained && trained.model && trained.model.optimizer) trained.model.optimizer.dispose();
+  if (trained && trained.model) trained.model.dispose();
   // train
   trained = await model.train(inputs, outputs, params, callback);
   ms = performance.now() - ms;
@@ -265,39 +267,54 @@ async function trainModel(input) {
   log('Model', layers);
   console.log('Model summary:', trained.model.summary());
   */
-  advice(ok(trained.stats.eval < 0.01), `Model evaluation: ${trained.stats.eval}`);
+  advice(ok(trained.stats.eval < 1), `Model evaluation: ${trained.stats.eval}% error`);
   log('Engine', tf.engine().memory());
 }
 
 async function validateModel(input, title) {
   if (!trained || !trained.model) return;
-  const ma = computeSMA(data.adjusted, params.inputWindow);
-  const inputs = ma.map((val) => val.set);
-  const outputs = ma.map((val) => val.val);
+  const ma = computeSMA(input, params.inputWindow, params.outputWindow);
+  const inputs = ma.map((val) => val.inputSet);
+  const outputs = ma.map((val) => val.outputSet);
+  const sma = ma.map((val) => val.sma);
   // validate
   const validationData = [{
-    x: data.time.slice(params.inputWindow - 1),
+    x: data.time.slice(params.inputWindow), // .slice(params.inputWindow - params.outputWindow), // data.time.slice((params.inputWindow - params.outputWindow) / 2),
     y: [],
-    name: title,
     type: 'lines',
     line: { color: 'lightcoral', shape: 'spline', width: 2, opacity: 0.2 },
+  }];
+  const smaData = [{
+    name: `SMA: ${params.inputWindow}`,
+    x: data.time.slice(params.inputWindow), // .slice(params.inputWindow / 2),
+    y: sma,
+    type: 'lines',
+    line: { color: '#888888', opacity: 0.5, shape: 'spline' },
   }];
   let pt = 0;
   while (pt < inputs.length) {
     const predictions = await model.predict(trained, inputs[pt]);
-    for (let i = 0; i < predictions.length; i++) {
-      validationData[0].y[pt] = predictions[i];
+    if (predictions.length === 1) {
+      validationData[0].y[pt] = predictions[0];
+    } else {
+      for (let i = 0; i < predictions.length; i++) validationData[0].y[pt] = predictions[i];
     }
     pt += predictions.length;
   }
-  let distance = 0;
-  const max = Math.max(...validationData[0].y);
+  let modelDistance = 0;
+  let smaDistance = 0;
   for (pt = 0; pt < inputs.length; pt++) {
-    distance += (((validationData[0].y[pt] - (outputs[pt]) / max)) ** 2) || 0;
+    modelDistance += ((validationData[0].y[pt] - outputs[pt]) ** 2) || 0;
+    smaDistance += ((smaData[0].y[pt] - outputs[pt]) ** 2) || 0;
   }
-  distance = Math.trunc(10000 * Math.sqrt(distance) / inputs.length) / 10000;
-  if (distance < 10) Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
-  advice(ok(distance < 10), `Model fit distance: ${distance}`);
+  modelDistance = Math.trunc(100 * 100 * Math.sqrt(modelDistance / inputs.length) / trained.stats.max) / 100;
+  smaDistance = Math.trunc(100 * 100 * Math.sqrt(smaDistance / inputs.length) / trained.stats.max) / 100;
+  validationData[0].name = `${title}: ${modelDistance}%`;
+  if ((modelDistance - smaDistance) < 2) {
+    Plotly.plot(document.getElementById('graph'), smaData, chart.layout, chart.options);
+    Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
+  }
+  advice(ok((modelDistance - smaDistance) < 2), `Model fit RMS: ${modelDistance}% | SMA RMS: ${smaDistance}%`);
 }
 
 async function predictModel(input, title) {
@@ -330,8 +347,8 @@ async function predictModel(input, title) {
     pt += predictions.length;
   }
   Plotly.plot(document.getElementById('graph'), predictionData, chart.layout, chart.options);
-  const perc = Math.trunc(100 * Math.abs(correction / input[input.length - 1])) / 100;
-  advice(ok(perc < 0.2), `Predict correction to SMA: ${perc}`);
+  const perc = Math.trunc(10000 * (correction / input[input.length - 1])) / 100;
+  advice(ok(Math.abs(perc) < 20), `Predict correction to SMA: ${perc}%`);
 }
 
 async function initTFJS() {
@@ -341,7 +358,7 @@ async function initTFJS() {
   await tf.enableProdMode();
   if (tf.getBackend() === 'webgl') {
     // tf.ENV.set('WEBGL_DELETE_TEXTURE_THRESHOLD', 0);
-    // tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', true);
+    // tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', false);
     // tf.ENV.set('WEBGL_PACK_DEPTHWISECONV', true);
     const gl = await tf.backend().getGPGPUContext().gl;
     log(`TFJS version: ${tf.version_core} backend: ${tf.getBackend().toUpperCase()} version: ${gl.getParameter(gl.VERSION)} renderer: ${gl.getParameter(gl.RENDERER)}`);
@@ -372,16 +389,16 @@ async function createMenu() {
   menu2.addButton('Train Model', 'Train Model', async () => {
     if (!data || !data.adjusted) return;
     await trainModel(data.adjusted);
-    await validateModel(data.adjusted, 'Model fit');
+    await validateModel(data.adjusted, 'Fit');
   });
   menu2.addRange('Input window', params, 'inputWindow', 1, 100, 1, (val) => params.inputWindow = parseInt(val));
-  // menu2.addRange('Output window', params, 'outputWindow', 1, 100, 1, (val) => params.outputWindow = parseInt(val));
+  menu2.addRange('Output window', params, 'outputWindow', 1, 100, 1, (val) => params.outputWindow = parseInt(val));
   menu2.addRange('Neurons', params, 'neurons', 1, 100, 1, (val) => params.neurons = parseInt(val));
   menu2.addRange('Features', params, 'features', 1, 100, 1, (val) => params.features = parseInt(val));
   menu2.addRange('LSTM layers', params, 'layers', 1, 10, 1, (val) => params.layers = parseInt(val));
   menu2.addRange('Training epochs', params, 'epochs', 1, 50, 1, (val) => params.epochs = parseInt(val));
   menu2.addRange('Validation split', params, 'validationSplit', 0.1, 0.9, 0.1, (val) => params.validationSplit = parseFloat(val));
-  menu2.addRange('Learning rate', params, 'learningRate', 0.005, 1, 0.01, (val) => params.learningRate = parseFloat(val));
+  menu2.addRange('Learning rate', params, 'learningRate', 0.001, 1, 0.001, (val) => params.learningRate = parseFloat(val));
   menu2.addBool('Forget bias', params, 'forgetBias', (val) => params.forgetBias = val);
   menu2.addBool('Shuffle data', params, 'shuffle', (val) => params.shuffle = val);
   menu2.addButton('Run Inference', 'Run Inference', async () => {

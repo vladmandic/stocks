@@ -1,5 +1,7 @@
 /* global Plotly */
 
+// <https://github.com/jinglescode/time-series-forecasting-tensorflowjs>  
+
 const input_dataset = [];
 let result = [];
 let data_raw = [];
