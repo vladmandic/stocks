@@ -28,7 +28,7 @@ const options = {
   key: fs.readFileSync('server/https.key'),
   cert: fs.readFileSync('server/https.crt'),
   root: '..',
-  default: 'src/lstm.html',
+  default: 'src/index.html',
   port: 8000,
   monitor: ['package.json', 'src'],
 };

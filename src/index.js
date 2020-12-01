@@ -22,7 +22,7 @@ const params = {
   inputWindow: 30,
   outputWindow: 1,
   predictWindow: 60,
-  epochs: 20,
+  epochs: 25,
   validationSplit: 0.2,
   optimizer: 'adam',
   learningRate: 0.002,
@@ -41,7 +41,6 @@ const params = {
   shuffle: false,
 };
 
-// eslint-disable-next-line no-unused-vars
 const markets = [
   { d: '', s: '', f: '' },
   { d: 'S&P 500', s: '^GSPC', f: 'ES=F' },
@@ -49,7 +48,6 @@ const markets = [
   { d: 'NASDAQ', s: '^IXIC', f: 'NQ=F' },
 ];
 
-// eslint-disable-next-line no-unused-vars
 const sectors = [
   { d: '', s: '' },
   { d: 'Consumer', s: '^SPSDYUP' },
@@ -252,7 +250,7 @@ async function trainModel(input) {
     if (!Number.isNaN(loss)) {
       lossData[0].y[epoch] = loss;
       lossLayout.yaxis = { tickprefix: '', autorange: false, range: [0, 1.2 * Math.max(...lossData[0].y)], visible: false };
-      lossLayout.title = epoch === params.epochs ? `Training complete: ${ms.toLocaleString()} ms Loss: ${lossData[0].y[epoch]}` : `Training: ${Math.trunc(100 * (epoch + 1) / params.epochs)}%`;
+      lossLayout.title = epoch === params.epochs ? `Trained: ${ms.toLocaleString()} ms Loss: ${lossData[0].y[epoch - 1]}` : `Training: ${Math.trunc(100 * (epoch + 1) / params.epochs)}%`;
       Plotly.newPlot(document.getElementById('train'), lossData, { ...chart.layout, ...lossLayout }, { ...chart.options, displayModeBar: false });
     }
   }
@@ -396,6 +394,7 @@ async function createMenu() {
   menu1.addButton('Init Engine', 'Init Engine', () => initTFJS());
   menu1.addList('Backend', ['cpu', 'webgl', 'wasm'], params.backend, (val) => params.backend = val);
   menu1.addList('Dtype', ['int32', 'float32'], params.dtype, (val) => params.dtype = val);
+  menu1.addHTML('<hr>');
   menu1.addButton('Get Data', 'Get Data', () => getData());
   const inputSymbol = menu1.addInput('Symbol', stock, 'symbol', (val) => stock.symbol = val);
   menu1.addList('Market', markets.map((val) => val.d), '', (val) => {
@@ -410,6 +409,7 @@ async function createMenu() {
   });
   menu1.addList('Interval', ['1m', '15m', '30m', '1h', '1d', '1wk', '1mo'], stock.interval, (val) => stock.interval = val);
   menu1.addList('Range', ['1d', '5d', '1mo', '3mo', '1y', '2y'], stock.range, (val) => stock.range = val);
+  menu1.addHTML('<hr>');
   menu1.addButton('Run Inference', 'Run Inference', async () => {
     if (!data || !data.adjusted) return;
     await predictModel(data.adjusted, 'Predict');
@@ -438,7 +438,7 @@ async function createMenu() {
   menu2.addRange('Max eval error', params, 'evalError', 0.1, 10, 0.1, (val) => params.evalError = parseFloat(val));
   menu2.addRange('Discard threshold', params, 'smaError', 0.1, 10, 0.1, (val) => params.smaError = parseFloat(val));
 
-  const menu3 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 420}px` });
+  const menu3 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 430}px` });
   menu3.addLabel('Model definition');
   menu3.addHTML('<hr>');
   menu3.addRange('Shape neurons', params, 'neurons', 1, 100, 1, (val) => params.neurons = parseInt(val));
@@ -457,7 +457,7 @@ async function createMenu() {
 }
 
 async function main() {
-  log('LSTM initializing');
+  log('Initializing');
   await createMenu();
   await initTFJS();
 

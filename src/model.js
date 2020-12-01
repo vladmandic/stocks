@@ -19,8 +19,8 @@ async function train(input, output, params, callback) {
     : tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).div(max - min).sub(sub).mul(mul));
 
   // check normalization
-  const t = outputT.dataSync();
-  console.log(Math.min(...t), Math.max(...t));
+  // const t = outputT.dataSync();
+  // console.log(Math.min(...t), Math.max(...t));
 
   // model definition
   model.add(tf.layers.dense({ // https://js.tensorflow.org/api/latest/#layers.dense
@@ -39,7 +39,7 @@ async function train(input, output, params, callback) {
 
   const cells = [];
   for (let index = 0; index < params.layers; index++) {
-    cells.push(tf.layers[params.cells]({ // https://js.tensorflow.org/api/latest/#layers.lstmCell
+    cells.push(tf.layers[params.cells]({ // https://js.tensorflow.org/api/latest/#Layers-Recurrent
       name: `cell${params.cells}${index}`,
       recurrentActivation: params.recurrentActivation || 'hardSigmoid',
       units: params.neurons,
@@ -87,10 +87,8 @@ async function train(input, output, params, callback) {
       validationSplit: params.validationSplit,
       shuffle: params.shuffle || false,
       callbacks: {
-        // onTrainBegin: (logs) => console.log('onTrainBegin', logs),
-        onEpochEnd: (epoch, logs) => normalizeLoss(epoch, logs),
-        // onTrainEnd: (logs) => console.log('onTrainEnd', logs),
         // onBatchEnd: (batch, logs) => console.log(batch, logs),
+        onEpochEnd: (epoch, logs) => normalizeLoss(epoch, logs),
       },
     });
   stats.params = params;

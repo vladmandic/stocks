@@ -1,9 +1,9 @@
 {
   "name": "@vladmandic/lstm",
   "version": "0.0.2",
-  "description": "LSTM: Time series analysis using machine learning long-short-term-memory",
+  "description": "Time series analysis using machine learning",
   "sideEffects": false,
-  "main": "dist/lstm.js",
+  "main": "dist/index.js",
   "author": "Vladimir Mandic <mandic00@live.com>",
   "bugs": {
     "url": "https://github.com/vladmandic/lstm/issues"
@@ -50,7 +50,10 @@
   },
   "keywords": [
     "tensorflowjs",
+    "stockmarket",
     "time-series",
-    "lstm"
+    "lstm",
+    "gru",
+    "rnn"
   ]
 }
