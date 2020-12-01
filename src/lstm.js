@@ -16,7 +16,7 @@ const stock = {
 const params = {
   backend: 'webgl',
   dtype: 'float32',
-  evalError: 1.0,
+  evalError: 2.5,
   smaError: 2.5,
 
   inputWindow: 30,
@@ -25,7 +25,7 @@ const params = {
   epochs: 20,
   validationSplit: 0.2,
   optimizer: 'adam',
-  learningRate: 0.001,
+  learningRate: 0.002,
   loss: 'meanSquaredError',
 
   neurons: 40,
@@ -303,12 +303,17 @@ async function validateModel(input, title) {
   let pt = 0;
   while (pt < inputs.length) {
     const predictions = await model.predict(trained, inputs[pt]);
-    if (predictions.length === 1) {
-      validationData[0].y[pt] = predictions[0];
+    if (!predictions || !predictions[0] || predictions[0] > (2 * trained.stats.max) || predictions[0] < (0.5 * trained.stats.min)) {
+      advice(ok(false), `Model fit out of range: ${predictions[0]}`);
+      pt = inputs.length;
     } else {
-      for (let i = 0; i < predictions.length; i++) validationData[0].y[pt] = predictions[i];
+      if (predictions.length === 1) {
+        validationData[0].y[pt] = predictions[0];
+      } else {
+        for (let i = 0; i < predictions.length; i++) validationData[0].y[pt] = predictions[i];
+      }
+      pt += predictions.length;
     }
-    pt += predictions.length;
   }
   let modelDistance = 0;
   let smaDistance = 0;
@@ -346,14 +351,19 @@ async function predictModel(input, title) {
   let correction = 0;
   while (pt < params.predictWindow) {
     const predictions = await model.predict(trained, last);
-    if (pt === 0) correction = predictions[0] - input[input.length - 1];
-    for (let i = 0; i < predictions.length; i++) {
-      predictionData[0].x[pt] = data.time[data.time.length - 1] + (pt * step) + (i * step);
-      predictionData[0].y[pt] = predictions[i] - correction;
+    if (!predictions || !predictions[0] || predictions[0] > (2 * trained.stats.max) || predictions[0] < (0.5 * trained.stats.min)) {
+      advice(ok(false), `Prediction out of range: ${predictions[0]}`);
+      pt = params.predictWindow;
+    } else {
+      if (pt === 0) correction = predictions[0] - input[input.length - 1];
+      for (let i = 0; i < predictions.length; i++) {
+        predictionData[0].x[pt] = data.time[data.time.length - 1] + (pt * step) + (i * step);
+        predictionData[0].y[pt] = predictions[i] - correction;
+      }
+      last.push(...predictions);
+      last.splice(0, predictions.length);
+      pt += predictions.length;
     }
-    last.push(...predictions);
-    last.splice(0, predictions.length);
-    pt += predictions.length;
   }
   Plotly.plot(document.getElementById('graph'), predictionData, chart.layout, chart.options);
   const perc = Math.trunc(10000 * (correction / input[input.length - 1])) / 100;

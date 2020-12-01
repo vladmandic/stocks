@@ -1,7 +1,8 @@
 import * as tf from '@tensorflow/tfjs';
 
 const int = 255;
-const sub = 0;
+const sub = 0.5;
+const mul = 1.5;
 
 async function train(input, output, params, callback) {
   // console.log('Training:', params, input, output);
@@ -9,12 +10,17 @@ async function train(input, output, params, callback) {
 
   // normalize inputs
   const max = Math.max(...output);
+  const min = Math.min(...output);
   const inputT = params.dtype === 'int32'
-    ? tf.tidy(() => tf.tensor2d(input, [input.length, params.inputWindow]).mul(int).div(max).toInt())
-    : tf.tidy(() => tf.tensor2d(input, [input.length, params.inputWindow]).div(max).sub(sub));
+    ? tf.tidy(() => tf.tensor2d(input, [input.length, params.inputWindow]).sub(min).mul(int).div(max - min).toInt())
+    : tf.tidy(() => tf.tensor2d(input, [input.length, params.inputWindow]).sub(min).div(max - min).sub(sub).mul(mul));
   const outputT = params.dtype === 'int32'
-    ? tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).mul(int).div(max).toInt())
-    : tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).div(max).sub(sub));
+    ? tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).mul(int).div(max - min).toInt())
+    : tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).div(max - min).sub(sub).mul(mul));
+
+  // check normalization
+  const t = outputT.dataSync();
+  console.log(Math.min(...t), Math.max(...t));
 
   // model definition
   model.add(tf.layers.dense({ // https://js.tensorflow.org/api/latest/#layers.dense
@@ -89,6 +95,7 @@ async function train(input, output, params, callback) {
     });
   stats.params = params;
   stats.max = max;
+  stats.min = min;
 
   const evaluateT = model.evaluate(inputT, outputT, { batchSize: params.inputWindow });
   stats.eval = Math.trunc(100000 * evaluateT.dataSync()[0]) / 1000;
@@ -100,12 +107,12 @@ async function train(input, output, params, callback) {
 
 async function predict(model, input) {
   const inputT = model.stats.params.dtype === 'int32'
-    ? tf.tidy(() => tf.tensor2d(input, [1, input.length]).mul(int).div(model.stats.max).toInt())
-    : tf.tidy(() => tf.tensor2d(input, [1, input.length]).div(model.stats.max).sub(sub));
+    ? tf.tidy(() => tf.tensor2d(input, [1, input.length]).sub(model.stats.min).mul(int).div(model.stats.max - model.stats.min).toInt())
+    : tf.tidy(() => tf.tensor2d(input, [1, input.length]).sub(model.stats.min).div(model.stats.max - model.stats.min).sub(sub).mul(mul));
   const outputT = model.model.predict(inputT, { batchSize: model.stats.params.inputWindow });
   const normalizeT = model.stats.params.dtype === 'int32'
-    ? tf.tidy(() => outputT.mul(model.stats.max).div(int))
-    : tf.tidy(() => outputT.add(sub).mul(model.stats.max));
+    ? tf.tidy(() => outputT.mul(model.stats.max - model.stats.min).div(int).add(model.stats.min))
+    : tf.tidy(() => outputT.div(mul).add(sub).mul(model.stats.max - model.stats.min).add(model.stats.min));
   const output = normalizeT.dataSync();
   inputT.dispose();
   normalizeT.dispose();
