@@ -33,14 +33,15 @@ async function train(input, output, params, callback) {
 
   const cells = [];
   for (let index = 0; index < params.layers; index++) {
-    cells.push(tf.layers.lstmCell({ // https://js.tensorflow.org/api/latest/#layers.lstmCell
-      name: `LayerLTSM${index}`,
+    cells.push(tf.layers[params.cells]({ // https://js.tensorflow.org/api/latest/#layers.lstmCell
+      name: `cell${params.cells}${index}`,
+      recurrentActivation: params.recurrentActivation || 'hardSigmoid',
       units: params.neurons,
+      activation: params.activation || 'tanh',
+      kernelInitializer: params.kernelInitializer || 'glorotNormal',
+      recurrentInitializer: params.kernelInitializer || 'glorotNormal',
       dtype: params.dtype || 'float32',
       unitForgetBias: params.forgetBias || false,
-      kernelInitializer: params.kernelInitializer || 'glorotNormal',
-      recurrentActivation: params.recurrentActivation || 'hardSigmoid',
-      activation: params.activation || 'tanh',
     }));
   }
 
@@ -60,14 +61,15 @@ async function train(input, output, params, callback) {
 
   // compile model
   // const rate = params.dtype === 'int32' ? params.learningRate * int : params.learningRate;
-  model.compile({ // https://js.tensorflow.org/api/latest/#train.adam
-    optimizer: tf.train.adam(params.learningRate),
+  model.compile({ // https://js.tensorflow.org/api/latest/#Training-Optimizers
+    optimizer: tf.train[params.optimizer](params.learningRate),
     loss: params.loss || 'meanSquaredError',
     // metrics: ['accuracy'],
   });
 
   // used by fit callback
   function normalizeLoss(epoch, logs) {
+    // console.log('onEpochEnd', epoch, logs);
     const loss = Math.trunc(1000 * Math.sqrt(logs.loss) / (params.dtype === 'int32' ? int : 1)) / 1000;
     callback(epoch, loss);
   }
@@ -79,7 +81,9 @@ async function train(input, output, params, callback) {
       validationSplit: params.validationSplit,
       shuffle: params.shuffle || false,
       callbacks: {
+        // onTrainBegin: (logs) => console.log('onTrainBegin', logs),
         onEpochEnd: (epoch, logs) => normalizeLoss(epoch, logs),
+        // onTrainEnd: (logs) => console.log('onTrainEnd', logs),
         // onBatchEnd: (batch, logs) => console.log(batch, logs),
       },
     });

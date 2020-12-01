@@ -1,5 +1,5 @@
 import Plotly from 'plotly.js-dist'; // <https://plotly.com/javascript/>
-import * as tf from '@tensorflow/tfjs';
+import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
 import * as wasm from '@tensorflow/tfjs-backend-wasm';
 import * as model from './model.js';
 import Menu from './menu.js';
@@ -9,29 +9,36 @@ let trained;
 
 const stock = {
   symbol: 'dell',
-  interval: '1d', // validIntervals:[1m,2m,5m,15m,30m,60m,90m,1h,1d,5d,1wk,1mo,3mo]
-  range: '1y', // validRanges:[1d,5d,1mo,3mo,6mo,1y,2y,5y]
+  interval: '1d',
+  range: '2y',
 };
 
 const params = {
-  epochs: 20,
-  learningRate: 0.001,
-  layers: 1,
+  backend: 'webgl',
+  dtype: 'float32',
+  evalError: 1.0,
+  smaError: 2.5,
+
   inputWindow: 30,
   outputWindow: 1,
   predictWindow: 60,
+  epochs: 20,
+  validationSplit: 0.2,
+  optimizer: 'adam',
+  learningRate: 0.001,
+  loss: 'meanSquaredError',
+
   neurons: 40,
   features: 10,
-  forgetBias: false,
-  // biasInitializer: 'leCunNormal',
+  layers: 1,
+  cells: 'lstmCell',
   kernelInitializer: 'leCunNormal',
-  recurrentActivation: 'relu',
-  // activation: 'tanh',
-  loss: 'meanSquaredError',
-  validationSplit: 0.2,
+  activation: 'relu',
+  recurrentActivation: 'hardSigmoid',
+
+  forgetBias: false,
+  biasInitializer: 'glorotNormal',
   shuffle: false,
-  dtype: 'float32',
-  backend: 'webgl',
 };
 
 // eslint-disable-next-line no-unused-vars
@@ -67,8 +74,8 @@ const chart = {
       showgrid: true,
       zeroline: true,
       showline: true,
-      autotick: false,
-      dtick: 15 * 1000 * 60 * 60 * 24,
+      autotick: true,
+      // dtick: 15 * 1000 * 60 * 60 * 24,
       showticklabels: true,
       gridcolor: '#555555',
     },
@@ -78,8 +85,8 @@ const chart = {
       showgrid: true,
       zeroline: true,
       showline: true,
-      autotick: false,
-      dtick: 10,
+      autotick: true,
+      // dtick: 10,
       tickprefix: '$',
       separatethousands: true,
       showticklabels: true,
@@ -177,8 +184,8 @@ async function drawGraph() {
     type: 'bar',
     marker: { color: 'steelblue' },
   });
-  chart.layout.xaxis.dtick = Math.trunc(data.time[0] / 1000);
-  chart.layout.yaxis.dtick = Math.trunc(Math.max(...data.adjusted) / 10);
+  // chart.layout.xaxis.dtick = Math.trunc(data.time[0] / 1000);
+  // chart.layout.yaxis.dtick = Math.trunc(Math.max(...data.adjusted) / 10);
   chart.layout.title = `${data.type}: ${data.exchange}/${data.symbol} [${data.range}/${data.granularity}]`;
   Plotly.newPlot(document.getElementById('graph'), chart.data, chart.layout, chart.options);
 }
@@ -228,6 +235,7 @@ async function trainModel(input) {
     texttemplate: '%{value:,.2r}',
     textposition: 'outside',
     line: { color: 'lightblue', width: 3 },
+    offset: 1,
   }];
   for (let i = 0; i <= params.epochs; i++) {
     lossData[0].x.push(i);
@@ -235,14 +243,14 @@ async function trainModel(input) {
   }
   const lossLayout = {
     xaxis: { type: 'scatter', autorange: false, range: [0, params.epochs + 1], dtick: 1, visible: false },
-    margin: { l: 0, r: 0, t: 40, b: 0 },
+    margin: { l: 0, r: 0, t: 40, b: 0, pad: 100 },
   };
   let ms = performance.now();
 
   // training callback on each epoch end
   function callback(epoch, loss) {
     if (!Number.isNaN(loss)) {
-      lossData[0].y[epoch + 1] = loss;
+      lossData[0].y[epoch] = loss;
       lossLayout.yaxis = { tickprefix: '', autorange: false, range: [0, 1.2 * Math.max(...lossData[0].y)], visible: false };
       lossLayout.title = epoch === params.epochs ? `Training complete: ${ms.toLocaleString()} ms Loss: ${lossData[0].y[epoch]}` : `Training: ${Math.trunc(100 * (epoch + 1) / params.epochs)}%`;
       Plotly.newPlot(document.getElementById('train'), lossData, { ...chart.layout, ...lossLayout }, { ...chart.options, displayModeBar: false });
@@ -253,9 +261,10 @@ async function trainModel(input) {
   if (trained && trained.model && trained.model.optimizer) trained.model.optimizer.dispose();
   if (trained && trained.model) trained.model.dispose();
   // train
+  callback(0, 0);
   trained = await model.train(inputs, outputs, params, callback);
   ms = performance.now() - ms;
-  callback(params.epochs, -1);
+  callback(params.epochs, 0);
   /*
   const layers = [];
   for (const layer of trained.model.layers) {
@@ -267,7 +276,7 @@ async function trainModel(input) {
   log('Model', layers);
   console.log('Model summary:', trained.model.summary());
   */
-  advice(ok(trained.stats.eval < 1), `Model evaluation: ${trained.stats.eval}% error`);
+  advice(ok(trained.stats.eval < params.evalError), `Model evaluation: ${trained.stats.eval}% error`);
   log('Engine', tf.engine().memory());
 }
 
@@ -310,11 +319,11 @@ async function validateModel(input, title) {
   modelDistance = Math.trunc(100 * 100 * Math.sqrt(modelDistance / inputs.length) / trained.stats.max) / 100;
   smaDistance = Math.trunc(100 * 100 * Math.sqrt(smaDistance / inputs.length) / trained.stats.max) / 100;
   validationData[0].name = `${title}: ${modelDistance}%`;
-  if ((modelDistance - smaDistance) < 2) {
+  if ((modelDistance - smaDistance) < params.smaError) {
     Plotly.plot(document.getElementById('graph'), smaData, chart.layout, chart.options);
     Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
   }
-  advice(ok((modelDistance - smaDistance) < 2), `Model fit RMS: ${modelDistance}% | SMA RMS: ${smaDistance}%`);
+  advice(ok((modelDistance - smaDistance) < params.smaError), `Model fit RMS: ${modelDistance}% | SMA RMS: ${smaDistance}%`);
 }
 
 async function predictModel(input, title) {
@@ -353,13 +362,12 @@ async function predictModel(input, title) {
 
 async function initTFJS() {
   wasm.setWasmPaths('../assets/');
-  // await tf.setBackend('webgl');
   await tf.setBackend(params.backend);
   await tf.enableProdMode();
   if (tf.getBackend() === 'webgl') {
     // tf.ENV.set('WEBGL_DELETE_TEXTURE_THRESHOLD', 0);
     // tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', false);
-    // tf.ENV.set('WEBGL_PACK_DEPTHWISECONV', true);
+    tf.ENV.set('WEBGL_PACK_DEPTHWISECONV', true);
     const gl = await tf.backend().getGPGPUContext().gl;
     log(`TFJS version: ${tf.version_core} backend: ${tf.getBackend().toUpperCase()} version: ${gl.getParameter(gl.VERSION)} renderer: ${gl.getParameter(gl.RENDERER)}`);
   } else if (tf.getBackend() === 'wasm') {
@@ -379,29 +387,20 @@ async function createMenu() {
   menu1.addList('Backend', ['cpu', 'webgl', 'wasm'], params.backend, (val) => params.backend = val);
   menu1.addList('Dtype', ['int32', 'float32'], params.dtype, (val) => params.dtype = val);
   menu1.addButton('Get Data', 'Get Data', () => getData());
-  menu1.addList('Market', markets.map((val) => val.d), '', (val) => stock.symbol = (markets.find((mkt) => val === mkt.d)).s);
-  menu1.addList('Sector', sectors.map((val) => val.d), '', (val) => stock.symbol = (sectors.find((mkt) => val === mkt.d)).s);
-  menu1.addInput('Symbol', stock, 'symbol', (val) => stock.symbol = val);
+  const inputSymbol = menu1.addInput('Symbol', stock, 'symbol', (val) => stock.symbol = val);
+  menu1.addList('Market', markets.map((val) => val.d), '', (val) => {
+    stock.symbol = (markets.find((mkt) => val === mkt.d)).s;
+    inputSymbol.value = stock.symbol;
+    getData();
+  });
+  menu1.addList('Sector', sectors.map((val) => val.d), '', (val) => {
+    stock.symbol = (sectors.find((mkt) => val === mkt.d)).s;
+    inputSymbol.value = stock.symbol;
+    getData();
+  });
   menu1.addList('Interval', ['1m', '15m', '30m', '1h', '1d', '1wk', '1mo'], stock.interval, (val) => stock.interval = val);
   menu1.addList('Range', ['1d', '5d', '1mo', '3mo', '1y', '2y'], stock.range, (val) => stock.range = val);
-
-  const menu2 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 200}px` });
-  menu2.addButton('Train Model', 'Train Model', async () => {
-    if (!data || !data.adjusted) return;
-    await trainModel(data.adjusted);
-    await validateModel(data.adjusted, 'Fit');
-  });
-  menu2.addRange('Input window', params, 'inputWindow', 1, 100, 1, (val) => params.inputWindow = parseInt(val));
-  menu2.addRange('Output window', params, 'outputWindow', 1, 100, 1, (val) => params.outputWindow = parseInt(val));
-  menu2.addRange('Neurons', params, 'neurons', 1, 100, 1, (val) => params.neurons = parseInt(val));
-  menu2.addRange('Features', params, 'features', 1, 100, 1, (val) => params.features = parseInt(val));
-  menu2.addRange('LSTM layers', params, 'layers', 1, 10, 1, (val) => params.layers = parseInt(val));
-  menu2.addRange('Training epochs', params, 'epochs', 1, 50, 1, (val) => params.epochs = parseInt(val));
-  menu2.addRange('Validation split', params, 'validationSplit', 0.1, 0.9, 0.1, (val) => params.validationSplit = parseFloat(val));
-  menu2.addRange('Learning rate', params, 'learningRate', 0.001, 1, 0.001, (val) => params.learningRate = parseFloat(val));
-  menu2.addBool('Forget bias', params, 'forgetBias', (val) => params.forgetBias = val);
-  menu2.addBool('Shuffle data', params, 'shuffle', (val) => params.shuffle = val);
-  menu2.addButton('Run Inference', 'Run Inference', async () => {
+  menu1.addButton('Run Inference', 'Run Inference', async () => {
     if (!data || !data.adjusted) return;
     await predictModel(data.adjusted, 'Predict');
     // await predictModel(data.open, 'Predict: Open');
@@ -409,7 +408,42 @@ async function createMenu() {
     // await predictModel(data.low, 'Predict: Low');
     // await predictModel(data.close, 'Predict: Close');
   });
-  menu2.addRange('Predict window', params, 'predictWindow', 1, 100, 1, (val) => params.predictWindow = parseInt(val));
+  menu1.addRange('Predict window', params, 'predictWindow', 1, 100, 1, (val) => params.predictWindow = parseInt(val));
+
+  const menu2 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 210}px` });
+  menu2.addButton('Train Model', 'Train Model', async () => {
+    if (!data || !data.adjusted) return;
+    await trainModel(data.adjusted);
+    await validateModel(data.adjusted, 'Fit');
+  });
+  menu2.addRange('Input window', params, 'inputWindow', 1, 100, 1, (val) => params.inputWindow = parseInt(val));
+  menu2.addRange('Output window', params, 'outputWindow', 1, 100, 1, (val) => params.outputWindow = parseInt(val));
+  menu2.addHTML('<hr>');
+  menu2.addRange('Training epochs', params, 'epochs', 1, 50, 1, (val) => params.epochs = parseInt(val));
+  menu2.addRange('Validation split', params, 'validationSplit', 0.1, 0.9, 0.1, (val) => params.validationSplit = parseFloat(val));
+  menu2.addHTML('<hr>');
+  menu2.addList('Optimizer', ['sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'], params.optimizer, (val) => params.optimizer = val);
+  menu2.addRange('Learning rate', params, 'learningRate', 0.001, 1, 0.001, (val) => params.learningRate = parseFloat(val));
+  menu2.addHTML('<hr>');
+  menu2.addRange('Max eval error', params, 'evalError', 0.1, 10, 0.1, (val) => params.evalError = parseFloat(val));
+  menu2.addRange('Discard threshold', params, 'smaError', 0.1, 10, 0.1, (val) => params.smaError = parseFloat(val));
+
+  const menu3 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 420}px` });
+  menu3.addLabel('Model definition');
+  menu3.addHTML('<hr>');
+  menu3.addRange('Shape neurons', params, 'neurons', 1, 100, 1, (val) => params.neurons = parseInt(val));
+  menu3.addRange('Shape features', params, 'features', 1, 100, 1, (val) => params.features = parseInt(val));
+  menu3.addHTML('<hr>');
+  menu3.addRange('Processing cells', params, 'layers', 1, 10, 1, (val) => params.layers = parseInt(val));
+  menu3.addList('Cell type', ['lstmCell', 'gruCell'], params.cells, (val) => params.cells = val);
+  menu3.addHTML('<hr>');
+  menu3.addList('Kernel initializer', ['glorotNormal', 'heNormal', 'leCunNormal', 'ones', 'randomNormal', 'zeros'], params.kernelInitializer, (val) => params.kernelInitializer = val);
+  menu3.addList('Activation', ['elu', 'hardSigmoid', 'linear', 'relu', 'relu6', 'selu', 'sigmoid', 'softmax', 'softplus', 'softsign', 'tanh'], params.activation, (val) => params.activation = val);
+  menu3.addList('Recurrent activation', ['elu', 'hardSigmoid', 'linear', 'relu', 'relu6', 'selu', 'sigmoid', 'softmax', 'softplus', 'softsign', 'tanh'], params.recurrentActivation, (val) => params.recurrentActivation = val);
+  menu3.addHTML('<hr>');
+  menu3.addBool('Forget bias', params, 'forgetBias', (val) => params.forgetBias = val);
+  menu3.addList('Bias initializer', ['glorotNormal', 'heNormal', 'leCunNormal', 'ones', 'randomNormal', 'zeros'], params.biasInitializer, (val) => params.biasInitializer = val);
+  menu3.addBool('Shuffle data', params, 'shuffle', (val) => params.shuffle = val);
 }
 
 async function main() {

@@ -52,7 +52,7 @@ function createCSS() {
   input[type=checkbox] { visibility: hidden; }
   input[type=checkbox]:checked + label { left: 1.4rem; background: ${theme.checkboxOn}; }
 
-  .menu-input { margin: 0.2rem 0.5rem 0 0; width: 6rem; background: ${theme.itemBackground}; color: ${theme.itemColor}; border: none; }
+  .menu-input { margin: 0.2rem 0.5rem 0 0; width: 6rem; background: ${theme.itemBackground}; color: ${theme.itemColor}; border: none; text-transform: uppercase; }
 
   .menu-range { margin: 0.2rem 0.5rem 0 0; width: 6rem; background: transparent; color: ${theme.rangeBackground}; }
   .menu-range:before { color: ${theme.rangeLabel}; margin: 0 0.4rem 0 0; font-weight: 800; font-size: 0.6rem; position: relative; top: 0.3rem; content: attr(value); }
@@ -234,7 +234,7 @@ class Menu {
       if (callback) callback(evt.target.value);
     });
     el.input = el.children[0];
-    return el;
+    return el.children;
   }
 
   addInput(title, object, variable, callback) {
@@ -248,7 +248,7 @@ class Menu {
       if (callback) callback(evt.target.value);
     });
     el.input = el.children[0];
-    return el;
+    return el.children[0];
   }
 
   addHTML(html) {
