@@ -1,5 +1,7 @@
+/* global tf, tfvis */
+
 import Plotly from 'plotly.js-dist'; // <https://plotly.com/javascript/>
-import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
+// import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
 import * as wasm from '@tensorflow/tfjs-backend-wasm';
 import * as model from './model.js';
 import Menu from './menu.js';
@@ -18,6 +20,7 @@ const params = {
   dtype: 'float32',
   evalError: 2.5,
   smaError: 2.5,
+  visor: false,
 
   inputWindow: 30,
   outputWindow: 1,
@@ -250,7 +253,7 @@ async function trainModel(input) {
     if (!Number.isNaN(loss)) {
       lossData[0].y[epoch] = loss;
       lossLayout.yaxis = { tickprefix: '', autorange: false, range: [0, 1.2 * Math.max(...lossData[0].y)], visible: false };
-      lossLayout.title = epoch === params.epochs ? `Trained: ${ms.toLocaleString()} ms Loss: ${lossData[0].y[epoch - 1]}` : `Training: ${Math.trunc(100 * (epoch + 1) / params.epochs)}%`;
+      lossLayout.title = epoch === params.epochs ? `Trained: ${ms.toLocaleString()} ms` : `Training: ${Math.trunc(100 * (epoch + 1) / params.epochs)}%`;
       Plotly.newPlot(document.getElementById('train'), lossData, { ...chart.layout, ...lossLayout }, { ...chart.options, displayModeBar: false });
     }
   }
@@ -274,7 +277,16 @@ async function trainModel(input) {
   log('Model', layers);
   console.log('Model summary:', trained.model.summary());
   */
+  advice(ok(lossData[0].y[params.epochs - 1] < 0.1), `Training loss: ${lossData[0].y[params.epochs - 1]}`);
   advice(ok(trained.stats.eval < params.evalError), `Model evaluation: ${trained.stats.eval}% error`);
+  advice(ok(trained.stats.accuracy < params.evalError), `Model accuracy: ${trained.stats.accuracy}% error`);
+  if (tfvis) {
+    tfvis.show.modelSummary({ name: 'Model Summary', tab: 'Visor' }, trained.model);
+    for (const i in trained.model.layers) {
+      tfvis.show.layer({ name: `Layer: ${trained.model.layers[i].name}`, tab: 'Visor' }, trained.model.getLayer(undefined, i));
+    }
+    document.getElementsByClassName('visor')[0].style.visibility = params.visor ? 'visible' : 'hidden';
+  }
   log('Engine', tf.engine().memory());
 }
 
@@ -369,7 +381,7 @@ async function predictModel(input, title) {
 }
 
 async function initTFJS() {
-  wasm.setWasmPaths('../assets/');
+  await wasm.setWasmPaths('../assets/');
   await tf.setBackend(params.backend);
   await tf.enableProdMode();
   if (tf.getBackend() === 'webgl') {
@@ -384,6 +396,9 @@ async function initTFJS() {
     log(`TFJS version: ${tf.version_core} backend: ${tf.getBackend().toUpperCase()}`);
   }
   await tf.ready();
+  if (tfvis) await tfvis.visor();
+  if (params.visor) tfvis.visor().open();
+  else tfvis.visor().close();
 }
 
 async function createMenu() {
@@ -437,6 +452,13 @@ async function createMenu() {
   menu2.addHTML('<hr>');
   menu2.addRange('Max eval error', params, 'evalError', 0.1, 10, 0.1, (val) => params.evalError = parseFloat(val));
   menu2.addRange('Discard threshold', params, 'smaError', 0.1, 10, 0.1, (val) => params.smaError = parseFloat(val));
+  menu2.addHTML('<hr>');
+  menu2.addBool('Show visor', params, 'visor', (val) => {
+    params.visor = val;
+    if (params.visor) tfvis.visor().open();
+    else tfvis.visor().close();
+    document.getElementsByClassName('visor')[0].style.visibility = params.visor ? 'visible' : 'hidden';
+  });
 
   const menu3 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 430}px` });
   menu3.addLabel('Model definition');
@@ -460,7 +482,6 @@ async function main() {
   log('Initializing');
   await createMenu();
   await initTFJS();
-
   await getData();
   // await trainModel(data.adjusted);
   // await validateModel(data.adjusted, 'Fit:');

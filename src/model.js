@@ -1,4 +1,6 @@
-import * as tf from '@tensorflow/tfjs';
+/* global tf, tfvis */
+
+// import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
 
 const int = 255;
 const sub = 0.5;
@@ -18,6 +20,7 @@ async function train(input, output, params, callback) {
     ? tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).mul(int).div(max - min).toInt())
     : tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).div(max - min).sub(sub).mul(mul));
 
+  if (tfvis) tfvis.show.valuesDistribution({ name: 'Data Distribution', tab: 'Visor' }, outputT);
   // check normalization
   // const t = outputT.dataSync();
   // console.log(Math.min(...t), Math.max(...t));
@@ -70,7 +73,7 @@ async function train(input, output, params, callback) {
   model.compile({ // https://js.tensorflow.org/api/latest/#Training-Optimizers
     optimizer: tf.train[params.optimizer](params.learningRate),
     loss: params.loss || 'meanSquaredError',
-    // metrics: ['accuracy'],
+    metrics: ['accuracy'],
   });
 
   // used by fit callback
@@ -80,14 +83,23 @@ async function train(input, output, params, callback) {
     callback(epoch, loss);
   }
 
+  const batchLogs = [];
+  function visorPlot(batch, logs) {
+    if (!params.visor) return;
+    batchLogs.push(logs);
+    const values = batchLogs.map((log) => ({ x: log.batch, y: log.loss }));
+    tfvis.render.linechart({ name: 'Batch Loss', tab: 'Visor' }, { values, series: ['loss'] });
+  }
+
   // execute fit with callback
   const stats = await model.fit(inputT, outputT, // https://js.tensorflow.org/api/latest/#tf.LayersModel.fit
     { batchSize: params.inputWindow,
       epochs: params.epochs,
       validationSplit: params.validationSplit,
       shuffle: params.shuffle || false,
+      // callbacks: tfvis.show.fitCallbacks({ name: 'Training Chart', tab: 'Visor' }, ['loss', 'acc']),
       callbacks: {
-        // onBatchEnd: (batch, logs) => console.log(batch, logs),
+        onBatchEnd: (batch, logs) => visorPlot(batch, logs),
         onEpochEnd: (epoch, logs) => normalizeLoss(epoch, logs),
       },
     });
@@ -96,10 +108,14 @@ async function train(input, output, params, callback) {
   stats.min = min;
 
   const evaluateT = model.evaluate(inputT, outputT, { batchSize: params.inputWindow });
-  stats.eval = Math.trunc(100000 * evaluateT.dataSync()[0]) / 1000;
   inputT.dispose();
   outputT.dispose();
-  evaluateT.dispose();
+  if (evaluateT) {
+    stats.eval = Math.trunc(100000 * evaluateT[0].dataSync()[0]) / 1000;
+    stats.accuracy = Math.trunc(100000 * evaluateT[1].dataSync()[0]) / 1000;
+    evaluateT[0].dispose();
+    evaluateT[1].dispose();
+  }
   return { model, stats };
 }
 

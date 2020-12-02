@@ -18,6 +18,7 @@
     "url": "git+https://github.com/vladmandic/lstm.git"
   },
   "dependencies": {
+    "@tensorflow/tfjs-vis": "^1.4.3",
     "node-fetch": "^2.6.1"
   },
   "peerDependencies": {},

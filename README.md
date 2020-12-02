@@ -1,5 +1,9 @@
 # Time series analysis using machine learning long-short-term-memory
 
+## Todo
+
+- Multi-parameter model
+
 ## Workflow
 
 ### Prepare Data

@@ -13,12 +13,20 @@
   <link rel="manifest" href="../manifest.json">
   <link rel="shortcut icon" href="../favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="../assets/icon.png">
+  <script src="../node_modules/@tensorflow/tfjs/dist/tf.es2017.min.js"></script>
+  <script src="../node_modules/@tensorflow/tfjs-vis/dist/tfjs-vis.umd.min.js"></script>
     <script src="../dist/index.js"></script>
     <style>
       /* @font-face { font-family: 'FA'; font-display: swap; font-style: normal; font-weight: 900; src: local('FA'), url('../assets/fa-solid-900.woff2'); } */
       html { font-family: 'system-ui'; font-size: 14px; }
-      body { margin: 0; background: black; color: white; overflow-x: hidden; scrollbar-width: none; }
+      body { margin: 0; background: black; color: white; overflow-x: hidden; scrollbar-width: none; width: 100vw; height: 100vh; }
       hr { width: 100%; }
+      ::-webkit-scrollbar { width: 1rem; }
+      ::-webkit-scrollbar-thumb { background: lightblue; }
+      .visor { background: gray; color: black; font-family: 'system-ui'; min-width: fit-content; }
+      .visor-controls { display: none; };
+      .visor-tabs { background: gray; };
+      .tf-surface { background: lightgray !important; max-height: fit-content !important; }
     </style>
   </head>
   <body>
@@ -26,8 +34,10 @@
     <div style="display: flex;">
       <div id="params" style="min-width:680px; min-height:420px; margin: 0.5rem; background: #222222"></div>
       <div id="train" style="min-width:340px; min-height:420px; margin: 0.5rem; background: #222222"></div>
-      <div id="advice" style="width: 100%; margin: 0.5rem; padding: 0.5rem; height:420px; overflow: hidden; background: #222222"></div>
+      <div id="advice" style="width: 100%; margin: 0.5rem; padding: 0.5rem; height:420px; overflow-x: hidden; overflow-y: scroll; background: #222222"></div>
     </div>
     <div id="log" style="height: 2.5rem; width: 100vw; overflow: hidden; margin: 0.5rem; position: fixed; bottom: 0;"></div>
   </body>
 </html>
+
+
