@@ -1,6 +1,6 @@
-/* global tf, tfvis */
+/* global tf, tfvis, Plotly */
 
-import Plotly from 'plotly.js-dist'; // <https://plotly.com/javascript/>
+// import Plotly from 'plotly.js-dist'; // <https://plotly.com/javascript/>
 // import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
 import * as wasm from '@tensorflow/tfjs-backend-wasm';
 import * as model from './model.js';
