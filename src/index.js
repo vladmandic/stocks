@@ -22,7 +22,7 @@ const params = {
   smaError: 2.5,
   visor: false,
 
-  inputWindow: 30,
+  inputWindow: 60,
   outputWindow: 1,
   predictWindow: 60,
   epochs: 25,
@@ -32,8 +32,8 @@ const params = {
   loss: 'meanSquaredError',
   targetLoss: 0.1,
 
-  neurons: 40,
-  features: 10,
+  neurons: 90,
+  features: 15,
   layers: 1,
   cells: 'lstmCell',
   kernelInitializer: 'leCunNormal',
@@ -227,6 +227,10 @@ async function trainModel(input) {
   advice('');
   advice('Training', params);
 
+  if (params.neurons % params.features !== 0) {
+    advice(ok(false), 'Params error: neurons must be divisible by features');
+    return;
+  }
   const ma = computeSMA(input, params.inputWindow, params.outputWindow);
   const inputs = ma.map((val) => val.inputSet);
   const outputs = ma.map((val) => val.outputSet);
@@ -271,21 +275,9 @@ async function trainModel(input) {
   callback(0, 0);
   trained = await model.train(inputs, outputs, params, callback);
   ms = performance.now() - ms;
-  // callback(params.epochs, 0);
-  /*
-  const layers = [];
-  for (const layer of trained.model.layers) {
-    // eslint-disable-next-line no-console
-    console.log('Layer:', layer);
-    if (layer.cell) layers.push({ cell: layer.cell.cells.map((val) => val.name) });
-    layers.push({ name: layer.name, shape: layer.outputShape });
-  }
-  log('Model', layers);
-  console.log('Model summary:', trained.model.summary());
-  */
-  // eslint-disable-next-line no-console
-  console.log('Model: ', trained.model);
   advice(ok(lossData[0].y[lastEpoch] < params.targetLoss), `Training loss: ${lossData[0].y[lastEpoch]}`);
+  callback(params.epochs, 0);
+  console.log('Model: ', trained.model);
   advice(ok(trained.stats.eval < params.evalError), `Model evaluation: ${trained.stats.eval}% error`);
   advice(ok(trained.stats.accuracy < params.evalError), `Model accuracy: ${trained.stats.accuracy}% error`);
   if (tfvis) {

@@ -42,7 +42,7 @@ async function train(input, output, params, callback) {
   model.add(tf.layers.reshape({ // https://js.tensorflow.org/api/latest/#layers.reshape
     name: 'layerReshape',
     trainable: false,
-    targetShape: [params.features, Math.trunc(params.neurons / params.features)],
+    targetShape: [params.features, (params.neurons / params.features)],
   }));
 
   const cells = [];
@@ -110,7 +110,7 @@ async function train(input, output, params, callback) {
     const loss = Math.trunc(1000 * Math.sqrt(logs.loss) / (params.dtype === 'int32' ? int : 1)) / 1000;
     if (loss < params.targetLoss) {
       model.stopTraining = true;
-      callback(epoch, loss, `Fit early stop: ${epoch} ${loss}`);
+      callback(epoch, loss, `Fit early stop: epoch: ${epoch} loss: ${loss}`);
     } else {
       callback(epoch, loss);
     }
