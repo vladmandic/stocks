@@ -30,6 +30,7 @@ const params = {
   optimizer: 'adam',
   learningRate: 0.002,
   loss: 'meanSquaredError',
+  targetLoss: 0.1,
 
   neurons: 40,
   features: 10,
@@ -38,6 +39,7 @@ const params = {
   kernelInitializer: 'leCunNormal',
   activation: 'relu',
   recurrentActivation: 'hardSigmoid',
+  // constraint: 'unitNorm',
 
   forgetBias: false,
   biasInitializer: 'glorotNormal',
@@ -222,6 +224,7 @@ async function getData() {
 
 async function trainModel(input) {
   if (!input) return;
+  advice('');
   advice('Training', params);
 
   const ma = computeSMA(input, params.inputWindow, params.outputWindow);
@@ -249,8 +252,11 @@ async function trainModel(input) {
   let ms = performance.now();
 
   // training callback on each epoch end
-  function callback(epoch, loss) {
+  let lastEpoch = 0;
+  function callback(epoch, loss, msg) {
+    if (msg) advice(ok(true), msg);
     if (!Number.isNaN(loss)) {
+      lastEpoch = epoch;
       lossData[0].y[epoch] = loss;
       lossLayout.yaxis = { tickprefix: '', autorange: false, range: [0, 1.2 * Math.max(...lossData[0].y)], visible: false };
       lossLayout.title = epoch === params.epochs ? `Trained: ${ms.toLocaleString()} ms` : `Training: ${Math.trunc(100 * (epoch + 1) / params.epochs)}%`;
@@ -265,7 +271,7 @@ async function trainModel(input) {
   callback(0, 0);
   trained = await model.train(inputs, outputs, params, callback);
   ms = performance.now() - ms;
-  callback(params.epochs, 0);
+  // callback(params.epochs, 0);
   /*
   const layers = [];
   for (const layer of trained.model.layers) {
@@ -277,7 +283,9 @@ async function trainModel(input) {
   log('Model', layers);
   console.log('Model summary:', trained.model.summary());
   */
-  advice(ok(lossData[0].y[params.epochs - 1] < 0.1), `Training loss: ${lossData[0].y[params.epochs - 1]}`);
+  // eslint-disable-next-line no-console
+  console.log('Model: ', trained.model);
+  advice(ok(lossData[0].y[lastEpoch] < params.targetLoss), `Training loss: ${lossData[0].y[lastEpoch]}`);
   advice(ok(trained.stats.eval < params.evalError), `Model evaluation: ${trained.stats.eval}% error`);
   advice(ok(trained.stats.accuracy < params.evalError), `Model accuracy: ${trained.stats.accuracy}% error`);
   if (tfvis) {
@@ -450,6 +458,7 @@ async function createMenu() {
   menu2.addList('Optimizer', ['sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'], params.optimizer, (val) => params.optimizer = val);
   menu2.addRange('Learning rate', params, 'learningRate', 0.001, 1, 0.001, (val) => params.learningRate = parseFloat(val));
   menu2.addHTML('<hr>');
+  menu2.addRange('Target loss', params, 'targetLoss', 0.01, 1, 0.1, (val) => params.targetLoss = parseFloat(val));
   menu2.addRange('Max eval error', params, 'evalError', 0.1, 10, 0.1, (val) => params.evalError = parseFloat(val));
   menu2.addRange('Discard threshold', params, 'smaError', 0.1, 10, 0.1, (val) => params.smaError = parseFloat(val));
   menu2.addHTML('<hr>');

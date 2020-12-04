@@ -28,15 +28,20 @@ async function train(input, output, params, callback) {
   // model definition
   model.add(tf.layers.dense({ // https://js.tensorflow.org/api/latest/#layers.dense
     name: 'layerDenseInput',
-    units: params.neurons,
-    unitForgetBias: params.forgetBias || false,
-    kernelInitializer: params.kernelInitializer || 'glorotNormal',
-    biasInitializer: params.biasInitializer || 'glorotNormal',
     batchInputShape: [1, params.inputWindow],
+    trainable: false,
+    units: params.neurons,
+
+    kernelInitializer: params.kernelInitializer || 'glorotNormal',
+    kernelConstraint: params.constraint,
+    biasInitializer: params.biasInitializer || 'glorotNormal',
+    biasConstraint: params.constraint,
+    unitForgetBias: params.forgetBias || false,
   }));
 
   model.add(tf.layers.reshape({ // https://js.tensorflow.org/api/latest/#layers.reshape
     name: 'layerReshape',
+    trainable: false,
     targetShape: [params.features, Math.trunc(params.neurons / params.features)],
   }));
 
@@ -44,28 +49,43 @@ async function train(input, output, params, callback) {
   for (let index = 0; index < params.layers; index++) {
     cells.push(tf.layers[params.cells]({ // https://js.tensorflow.org/api/latest/#Layers-Recurrent
       name: `cell${params.cells}${index}`,
+      trainable: true,
+      dtype: params.dtype || 'float32',
       recurrentActivation: params.recurrentActivation || 'hardSigmoid',
       units: params.neurons,
+
       activation: params.activation || 'tanh',
       kernelInitializer: params.kernelInitializer || 'glorotNormal',
+      kernelConstraint: params.constraint,
       recurrentInitializer: params.kernelInitializer || 'glorotNormal',
-      dtype: params.dtype || 'float32',
+      recurrentConstraint: params.constraint,
+      biasInitializer: params.biasInitializer || 'glorotNormal',
+      biasConstraint: params.constraint,
       unitForgetBias: params.forgetBias || false,
     }));
   }
 
   model.add(tf.layers.rnn({ // https://js.tensorflow.org/api/latest/#layers.rnn
     name: 'layerRNN',
+    trainable: true,
     cell: cells,
     returnSequences: false,
+    returnState: false,
+    statefull: !params.shuffle || true,
     dtype: params.dtype,
   }));
 
   model.add(tf.layers.dense({ // https://js.tensorflow.org/api/latest/#layers.dense
     name: 'layerDenseOutput',
     units: 1, // params.outputWindow,
-    kernelInitializer: params.kernelInitializer || 'glorotNormal',
     dtype: params.dtype || 'float32',
+    trainable: true,
+
+    kernelInitializer: params.kernelInitializer || 'glorotNormal',
+    kernelConstraint: params.constraint,
+    biasInitializer: params.biasInitializer || 'glorotNormal',
+    biasConstraint: params.constraint,
+    unitForgetBias: params.forgetBias || false,
   }));
 
   // compile model
@@ -76,19 +96,24 @@ async function train(input, output, params, callback) {
     metrics: ['accuracy'],
   });
 
-  // used by fit callback
-  function normalizeLoss(epoch, logs) {
-    // console.log('onEpochEnd', epoch, logs);
-    const loss = Math.trunc(1000 * Math.sqrt(logs.loss) / (params.dtype === 'int32' ? int : 1)) / 1000;
-    callback(epoch, loss);
-  }
-
   const batchLogs = [];
   function visorPlot(batch, logs) {
     if (!params.visor) return;
     batchLogs.push(logs);
     const values = batchLogs.map((log) => ({ x: log.batch, y: log.loss }));
     tfvis.render.linechart({ name: 'Batch Loss', tab: 'Visor' }, { values, series: ['loss'] });
+  }
+
+  // used by fit callback
+  function fitEpochCallback(epoch, logs) {
+    // if (epoch === 2) model.stopTraining = true;
+    const loss = Math.trunc(1000 * Math.sqrt(logs.loss) / (params.dtype === 'int32' ? int : 1)) / 1000;
+    if (loss < params.targetLoss) {
+      model.stopTraining = true;
+      callback(epoch, loss, `Fit early stop: ${epoch} ${loss}`);
+    } else {
+      callback(epoch, loss);
+    }
   }
 
   // execute fit with callback
@@ -98,9 +123,10 @@ async function train(input, output, params, callback) {
       validationSplit: params.validationSplit,
       shuffle: params.shuffle || false,
       // callbacks: tfvis.show.fitCallbacks({ name: 'Training Chart', tab: 'Visor' }, ['loss', 'acc']),
+      // callbacks: tf.callbacks.earlyStopping({monitor: 'val_acc'})
       callbacks: {
         onBatchEnd: (batch, logs) => visorPlot(batch, logs),
-        onEpochEnd: (epoch, logs) => normalizeLoss(epoch, logs),
+        onEpochEnd: (epoch, logs) => fitEpochCallback(epoch, logs),
       },
     });
   stats.params = params;
