@@ -28,12 +28,12 @@ const params = {
   epochs: 25,
   validationSplit: 0.2,
   optimizer: 'adam',
-  learningRate: 0.002,
+  learningRate: 0.005,
   loss: 'meanSquaredError',
   targetLoss: 0.1,
 
-  neurons: 90,
-  features: 15,
+  neurons: 60,
+  features: 10,
   layers: 1,
   cells: 'lstmCell',
   kernelInitializer: 'leCunNormal',
@@ -43,7 +43,7 @@ const params = {
 
   forgetBias: false,
   biasInitializer: 'glorotNormal',
-  shuffle: false,
+  shuffle: true,
 };
 
 const markets = [
@@ -275,11 +275,11 @@ async function trainModel(input) {
   callback(0, 0);
   trained = await model.train(inputs, outputs, params, callback);
   ms = performance.now() - ms;
-  advice(ok(lossData[0].y[lastEpoch] < params.targetLoss), `Training loss: ${lossData[0].y[lastEpoch]}`);
+  trained.stats.loss = lossData[0].y[lastEpoch];
+  advice(ok(trained.stats.loss < params.targetLoss), `Training loss: ${trained.stats.loss}`);
   callback(params.epochs, 0);
-  console.log('Model: ', trained.model);
   advice(ok(trained.stats.eval < params.evalError), `Model evaluation: ${trained.stats.eval}% error`);
-  advice(ok(trained.stats.accuracy < params.evalError), `Model accuracy: ${trained.stats.accuracy}% error`);
+  // advice(ok(trained.stats.accuracy < params.evalError), `Model accuracy: ${trained.stats.accuracy}% error`);
   if (tfvis) {
     tfvis.show.modelSummary({ name: 'Model Summary', tab: 'Visor' }, trained.model);
     for (const i in trained.model.layers) {
@@ -325,20 +325,20 @@ async function validateModel(input, title) {
       pt += predictions.length;
     }
   }
-  let modelDistance = 0;
   let smaDistance = 0;
+  trained.stats.distance = 0;
   for (pt = 0; pt < inputs.length; pt++) {
-    modelDistance += ((validationData[0].y[pt] - outputs[pt]) ** 2) || 0;
+    trained.stats.distance += ((validationData[0].y[pt] - outputs[pt]) ** 2) || 0;
     smaDistance += ((smaData[0].y[pt] - outputs[pt]) ** 2) || 0;
   }
-  modelDistance = Math.trunc(100 * 100 * Math.sqrt(modelDistance / inputs.length) / trained.stats.max) / 100;
+  trained.stats.distance = Math.trunc(100 * 100 * Math.sqrt(trained.stats.distance / inputs.length) / trained.stats.max) / 100;
   smaDistance = Math.trunc(100 * 100 * Math.sqrt(smaDistance / inputs.length) / trained.stats.max) / 100;
-  validationData[0].name = `${title}: ${modelDistance}%`;
-  if ((modelDistance - smaDistance) < params.smaError) {
+  validationData[0].name = `${title}: ${trained.stats.distance}%`;
+  if ((trained.stats.distance - smaDistance) < params.smaError) {
     Plotly.plot(document.getElementById('graph'), smaData, chart.layout, chart.options);
     Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
   }
-  advice(ok((modelDistance - smaDistance) < params.smaError), `Model fit RMS: ${modelDistance}% | SMA RMS: ${smaDistance}%`);
+  advice(ok((trained.stats.distance - smaDistance) < params.smaError), `Model fit RMS: ${trained.stats.distance}% | SMA RMS: ${smaDistance}%`);
 }
 
 async function predictModel(input, title) {
@@ -477,6 +477,14 @@ async function createMenu() {
   menu3.addBool('Forget bias', params, 'forgetBias', (val) => params.forgetBias = val);
   menu3.addList('Bias initializer', ['glorotNormal', 'heNormal', 'leCunNormal', 'ones', 'randomNormal', 'zeros'], params.biasInitializer, (val) => params.biasInitializer = val);
   menu3.addBool('Shuffle data', params, 'shuffle', (val) => params.shuffle = val);
+
+  document.getElementById('advice').addEventListener('click', () => {
+    delete trained.stats.epoch;
+    delete trained.stats.history;
+    delete trained.stats.acc;
+    delete trained.stats.validationData;
+    navigator.clipboard.writeText(JSON.stringify({ ...stock, ...trained.stats }, null, 2));
+  });
 }
 
 async function main() {

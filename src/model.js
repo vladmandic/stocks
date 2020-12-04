@@ -21,9 +21,6 @@ async function train(input, output, params, callback) {
     : tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).div(max - min).sub(sub).mul(mul));
 
   if (tfvis) tfvis.show.valuesDistribution({ name: 'Data Distribution', tab: 'Visor' }, outputT);
-  // check normalization
-  // const t = outputT.dataSync();
-  // console.log(Math.min(...t), Math.max(...t));
 
   // model definition
   model.add(tf.layers.dense({ // https://js.tensorflow.org/api/latest/#layers.dense
@@ -130,8 +127,9 @@ async function train(input, output, params, callback) {
       },
     });
   stats.params = params;
-  stats.max = max;
-  stats.min = min;
+  stats.max = Math.trunc(10000 * max) / 10000;
+  stats.min = Math.trunc(10000 * min) / 10000;
+  stats.length = output.length;
 
   const evaluateT = model.evaluate(inputT, outputT, { batchSize: params.inputWindow });
   inputT.dispose();
