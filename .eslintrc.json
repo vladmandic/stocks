@@ -29,6 +29,7 @@
     "import/no-absolute-path": "off",
     "import/no-extraneous-dependencies": "off",
     "import/prefer-default-export": "off",
+    "import/no-mutable-exports": "off",
     "max-len": [1, 275, 3],
     "newline-per-chained-call": "off",
     "no-async-promise-executor": "off",

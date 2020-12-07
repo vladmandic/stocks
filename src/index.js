@@ -7,7 +7,6 @@ import * as model from './model.js';
 import Menu from './menu.js';
 
 let data;
-let trained;
 
 const stock = {
   symbol: 'dell',
@@ -141,7 +140,7 @@ function advice(...msg) {
   div.scrollTop = div.scrollHeight;
 }
 
-function computeSMA(input, inputWindow, outputWindow = 1) {
+function computeWindow(input, inputWindow, outputWindow = 1) {
   const arr = [];
   for (let i = inputWindow; i <= (input.length - outputWindow); i++) {
     const inputSet = []; // history: create set of values up to index
@@ -231,7 +230,7 @@ async function trainModel(input) {
     advice(ok(false), 'Params error: neurons must be divisible by features');
     return;
   }
-  const ma = computeSMA(input, params.inputWindow, params.outputWindow);
+  const ma = computeWindow(input, params.inputWindow, params.outputWindow);
   const inputs = ma.map((val) => val.inputSet);
   const outputs = ma.map((val) => val.outputSet);
   // train graph
@@ -268,22 +267,19 @@ async function trainModel(input) {
     }
   }
 
-  // dispose previous model (still leaking 8 tensors)
-  if (trained && trained.model && trained.model.optimizer) trained.model.optimizer.dispose();
-  if (trained && trained.model) trained.model.dispose();
   // train
   callback(0, 0);
-  trained = await model.train(inputs, outputs, params, callback);
+  await model.train(inputs, outputs, params, callback);
   ms = performance.now() - ms;
-  trained.stats.loss = lossData[0].y[lastEpoch];
-  advice(ok(trained.stats.loss < params.targetLoss), `Training loss: ${trained.stats.loss}`);
+  model.stats.loss = lossData[0].y[lastEpoch];
+  advice(ok(model.stats.loss < params.targetLoss), `Training loss: ${model.stats.loss}`);
   callback(params.epochs, 0);
-  advice(ok(trained.stats.eval < params.evalError), `Model evaluation: ${trained.stats.eval}% error`);
-  // advice(ok(trained.stats.accuracy < params.evalError), `Model accuracy: ${trained.stats.accuracy}% error`);
+  advice(ok(model.stats.eval < params.evalError), `Model evaluation: ${model.stats.eval}% error`);
+  // advice(ok(trained.model.stats.accuracy < params.evalError), `Model accuracy: ${trained.model.stats.accuracy}% error`);
   if (tfvis) {
-    tfvis.show.modelSummary({ name: 'Model Summary', tab: 'Visor' }, trained.model);
-    for (const i in trained.model.layers) {
-      tfvis.show.layer({ name: `Layer: ${trained.model.layers[i].name}`, tab: 'Visor' }, trained.model.getLayer(undefined, i));
+    tfvis.show.modelSummary({ name: 'Model Summary', tab: 'Visor' }, model.model);
+    for (const i in model.model.layers) {
+      tfvis.show.layer({ name: `Layer: ${model.model.layers[i].name}`, tab: 'Visor' }, model.model.getLayer(undefined, i));
     }
     document.getElementsByClassName('visor')[0].style.visibility = params.visor ? 'visible' : 'hidden';
   }
@@ -291,8 +287,7 @@ async function trainModel(input) {
 }
 
 async function validateModel(input, title) {
-  if (!trained || !trained.model) return;
-  const ma = computeSMA(input, params.inputWindow, params.outputWindow);
+  const ma = computeWindow(input, params.inputWindow, params.outputWindow);
   const inputs = ma.map((val) => val.inputSet);
   const outputs = ma.map((val) => val.outputSet);
   const sma = ma.map((val) => val.sma);
@@ -312,8 +307,8 @@ async function validateModel(input, title) {
   }];
   let pt = 0;
   while (pt < inputs.length) {
-    const predictions = await model.predict(trained, inputs[pt]);
-    if (!predictions || !predictions[0] || predictions[0] > (2 * trained.stats.max) || predictions[0] < (0.5 * trained.stats.min)) {
+    const predictions = await model.predict(inputs[pt]);
+    if (!predictions || !predictions[0] || predictions[0] > (2 * model.stats.max) || predictions[0] < (0.5 * model.stats.min)) {
       advice(ok(false), `Model fit out of range: ${predictions[0]}`);
       pt = inputs.length;
     } else {
@@ -326,23 +321,22 @@ async function validateModel(input, title) {
     }
   }
   let smaDistance = 0;
-  trained.stats.distance = 0;
+  model.stats.distance = 0;
   for (pt = 0; pt < inputs.length; pt++) {
-    trained.stats.distance += ((validationData[0].y[pt] - outputs[pt]) ** 2) || 0;
+    model.stats.distance += ((validationData[0].y[pt] - outputs[pt]) ** 2) || 0;
     smaDistance += ((smaData[0].y[pt] - outputs[pt]) ** 2) || 0;
   }
-  trained.stats.distance = Math.trunc(100 * 100 * Math.sqrt(trained.stats.distance / inputs.length) / trained.stats.max) / 100;
-  smaDistance = Math.trunc(100 * 100 * Math.sqrt(smaDistance / inputs.length) / trained.stats.max) / 100;
-  validationData[0].name = `${title}: ${trained.stats.distance}%`;
-  if ((trained.stats.distance - smaDistance) < params.smaError) {
+  model.stats.distance = Math.trunc(100 * 100 * Math.sqrt(model.stats.distance / inputs.length) / model.stats.max) / 100;
+  smaDistance = Math.trunc(100 * 100 * Math.sqrt(smaDistance / inputs.length) / model.stats.max) / 100;
+  validationData[0].name = `${title}: ${model.stats.distance}%`;
+  if ((model.stats.distance - smaDistance) < params.smaError) {
     Plotly.plot(document.getElementById('graph'), smaData, chart.layout, chart.options);
     Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
   }
-  advice(ok((trained.stats.distance - smaDistance) < params.smaError), `Model fit RMS: ${trained.stats.distance}% | SMA RMS: ${smaDistance}%`);
+  advice(ok((model.stats.distance - smaDistance) < params.smaError), `Model fit RMS: ${model.stats.distance}% | SMA RMS: ${smaDistance}%`);
 }
 
 async function predictModel(input, title) {
-  if (!trained || !trained.model) return;
   // get last known sequence
   const last = [];
   for (let i = 0; i < params.inputWindow; i++) {
@@ -360,8 +354,8 @@ async function predictModel(input, title) {
   let pt = 0;
   let correction = 0;
   while (pt < params.predictWindow) {
-    const predictions = await model.predict(trained, last);
-    if (!predictions || !predictions[0] || predictions[0] > (2 * trained.stats.max) || predictions[0] < (0.5 * trained.stats.min)) {
+    const predictions = await model.predict(last);
+    if (!predictions || !predictions[0] || predictions[0] > (2 * model.stats.max) || predictions[0] < (0.5 * model.stats.min)) {
       advice(ok(false), `Prediction out of range: ${predictions[0]}`);
       pt = params.predictWindow;
     } else {
@@ -479,11 +473,11 @@ async function createMenu() {
   menu3.addBool('Shuffle data', params, 'shuffle', (val) => params.shuffle = val);
 
   document.getElementById('advice').addEventListener('click', () => {
-    delete trained.stats.epoch;
-    delete trained.stats.history;
-    delete trained.stats.acc;
-    delete trained.stats.validationData;
-    navigator.clipboard.writeText(JSON.stringify({ ...stock, ...trained.stats }, null, 2));
+    delete model.stats.epoch;
+    delete model.stats.history;
+    delete model.stats.acc;
+    delete model.stats.validationData;
+    navigator.clipboard.writeText(JSON.stringify({ ...stock, ...model.stats }, null, 2));
   });
 }
 
