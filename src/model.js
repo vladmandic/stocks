@@ -152,6 +152,7 @@ async function train(input, output, params, callback) {
 }
 
 async function predict(input) {
+  if (!stats || !stats.params) return null;
   const inputT = stats.params.dtype === 'int32'
     ? tf.tidy(() => tf.tensor2d(input, [1, input.length]).sub(stats.min).mul(int).div(stats.max - stats.min).toInt())
     : tf.tidy(() => tf.tensor2d(input, [1, input.length]).sub(stats.min).div(stats.max - stats.min).sub(sub).mul(mul));

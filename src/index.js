@@ -6,15 +6,15 @@ import * as wasm from '@tensorflow/tfjs-backend-wasm';
 import * as model from './model.js';
 import Menu from './menu.js';
 
-let data;
+let data = { input: [], validation: [], prediction: [], stats: {} };
 
-const stock = {
+let stock = {
   symbol: 'dell',
   interval: '1d',
   range: '2y',
 };
 
-const params = {
+let params = {
   backend: 'webgl',
   dtype: 'float32',
   evalError: 2.5,
@@ -159,36 +159,36 @@ function computeWindow(input, inputWindow, outputWindow = 1) {
 }
 
 async function drawGraph() {
-  if (!data) return;
-  const maxPrice = Math.max(...data.adjusted);
-  const maxVolume = Math.max(...data.volume);
+  if (!data.input) return;
+  const maxPrice = Math.max(...data.input.adjusted);
+  const maxVolume = Math.max(...data.input.volume);
   chart.data = [];
   chart.data.push({
     name: 'Price',
-    x: data.time,
-    y: data.adjusted,
+    x: data.input.time,
+    y: data.input.adjusted,
     type: 'lines',
     line: { color: 'lightblue', shape: 'spline', width: 3 },
   });
   chart.data.push({
     name: 'OHLC',
-    x: data.time,
-    open: data.open,
-    close: data.close,
-    high: data.high,
-    low: data.low,
+    x: data.input.time,
+    open: data.input.open,
+    close: data.input.close,
+    high: data.input.high,
+    low: data.input.low,
     type: 'candlestick',
   });
   chart.data.push({
     name: 'Volume',
-    x: data.time,
-    y: data.volume.map((val) => maxPrice * val / maxVolume / 2),
+    x: data.input.time,
+    y: data.input.volume.map((val) => maxPrice * val / maxVolume / 2),
     type: 'bar',
     marker: { color: 'steelblue' },
   });
-  // chart.layout.xaxis.dtick = Math.trunc(data.time[0] / 1000);
-  // chart.layout.yaxis.dtick = Math.trunc(Math.max(...data.adjusted) / 10);
-  chart.layout.title = `${data.type}: ${data.exchange}/${data.symbol} [${data.range}/${data.granularity}]`;
+  // chart.layout.xaxis.dtick = Math.trunc(data.input.time[0] / 1000);
+  // chart.layout.yaxis.dtick = Math.trunc(Math.max(...data.input.adjusted) / 10);
+  chart.layout.title = `${data.input.type}: ${data.input.exchange}/${data.input.symbol} [${data.input.range}/${data.input.granularity}]`;
   Plotly.newPlot(document.getElementById('graph'), chart.data, chart.layout, chart.options);
 }
 
@@ -200,7 +200,7 @@ async function getData() {
     log('data error:', stock.symbol);
     return;
   }
-  data = {
+  data.input = {
     type: json.chart.result[0].meta.instrumentType,
     exchange: json.chart.result[0].meta.exchangeName,
     symbol: json.chart.result[0].meta.symbol,
@@ -216,9 +216,9 @@ async function getData() {
     close: json.chart.result[0].indicators.quote[0].close.map((val) => parseFloat(val)),
     time: json.chart.result[0].timestamp.map((val) => 1000 * parseInt(val)),
   };
-  advice(ok(data.adjusted && data.adjusted.length > 0), `Data: ${data.type}: ${data.exchange}/${data.symbol} [${data.range}/${data.granularity}]`);
+  advice(ok(data.input.adjusted && data.input.adjusted.length > 0), `Data: ${data.input.type}: ${data.input.exchange}/${data.input.symbol} [${data.input.range}/${data.input.granularity}]`);
   await drawGraph();
-  advice(ok(data.adjusted.length > 250), `Data set size: ${data.adjusted.length}`);
+  advice(ok(data.input.adjusted.length > 250), `Data set size: ${data.input.adjusted.length}`);
 }
 
 async function trainModel(input) {
@@ -292,15 +292,15 @@ async function validateModel(input, title) {
   const outputs = ma.map((val) => val.outputSet);
   const sma = ma.map((val) => val.sma);
   // validate
-  const validationData = [{
-    x: data.time.slice(params.inputWindow), // .slice(params.inputWindow - params.outputWindow), // data.time.slice((params.inputWindow - params.outputWindow) / 2),
+  data.validation = [{
+    x: data.input.time.slice(params.inputWindow), // .slice(params.inputWindow - params.outputWindow), // data.input.time.slice((params.inputWindow - params.outputWindow) / 2),
     y: [],
     type: 'lines',
     line: { color: 'lightcoral', shape: 'spline', width: 2, opacity: 0.2 },
   }];
   const smaData = [{
     name: `SMA: ${params.inputWindow}`,
-    x: data.time.slice(params.inputWindow), // .slice(params.inputWindow / 2),
+    x: data.input.time.slice(params.inputWindow), // .slice(params.inputWindow / 2),
     y: sma,
     type: 'lines',
     line: { color: '#888888', opacity: 0.5, shape: 'spline' },
@@ -313,9 +313,9 @@ async function validateModel(input, title) {
       pt = inputs.length;
     } else {
       if (predictions.length === 1) {
-        validationData[0].y[pt] = predictions[0];
+        data.validation[0].y[pt] = predictions[0];
       } else {
-        for (let i = 0; i < predictions.length; i++) validationData[0].y[pt] = predictions[i];
+        for (let i = 0; i < predictions.length; i++) data.prediction[0].y[pt] = predictions[i];
       }
       pt += predictions.length;
     }
@@ -323,15 +323,15 @@ async function validateModel(input, title) {
   let smaDistance = 0;
   model.stats.distance = 0;
   for (pt = 0; pt < inputs.length; pt++) {
-    model.stats.distance += ((validationData[0].y[pt] - outputs[pt]) ** 2) || 0;
+    model.stats.distance += ((data.validation[0].y[pt] - outputs[pt]) ** 2) || 0;
     smaDistance += ((smaData[0].y[pt] - outputs[pt]) ** 2) || 0;
   }
   model.stats.distance = Math.trunc(100 * 100 * Math.sqrt(model.stats.distance / inputs.length) / model.stats.max) / 100;
   smaDistance = Math.trunc(100 * 100 * Math.sqrt(smaDistance / inputs.length) / model.stats.max) / 100;
-  validationData[0].name = `${title}: ${model.stats.distance}%`;
+  data.validation[0].name = `${title}: ${model.stats.distance}%`;
   if ((model.stats.distance - smaDistance) < params.smaError) {
     Plotly.plot(document.getElementById('graph'), smaData, chart.layout, chart.options);
-    Plotly.plot(document.getElementById('graph'), validationData, chart.layout, chart.options);
+    Plotly.plot(document.getElementById('graph'), data.validation, chart.layout, chart.options);
   }
   advice(ok((model.stats.distance - smaDistance) < params.smaError), `Model fit RMS: ${model.stats.distance}% | SMA RMS: ${smaDistance}%`);
 }
@@ -343,35 +343,84 @@ async function predictModel(input, title) {
     last.push(input[input.length - params.inputWindow + i]);
   }
   // validate
-  const predictionData = [{
+  data.prediction = [{
     x: [],
     y: [],
     name: title,
     type: 'lines',
     line: { color: 'lightyellow', shape: 'spline', width: 3, opacity: 0.5 },
   }];
-  const step = (data.time[data.time.length - 1] - data.time[0]) / data.time.length;
+  const step = (data.input.time[data.input.time.length - 1] - data.input.time[0]) / data.input.time.length;
   let pt = 0;
   let correction = 0;
   while (pt < params.predictWindow) {
     const predictions = await model.predict(last);
     if (!predictions || !predictions[0] || predictions[0] > (2 * model.stats.max) || predictions[0] < (0.5 * model.stats.min)) {
-      advice(ok(false), `Prediction out of range: ${predictions[0]}`);
+      if (!predictions) advice(ok(false), 'No predictions');
+      else advice(ok(false), `Prediction out of range: ${predictions[0]}`);
       pt = params.predictWindow;
     } else {
       if (pt === 0) correction = predictions[0] - input[input.length - 1];
       for (let i = 0; i < predictions.length; i++) {
-        predictionData[0].x[pt] = data.time[data.time.length - 1] + (pt * step) + (i * step);
-        predictionData[0].y[pt] = predictions[i] - correction;
+        data.prediction[0].x[pt] = data.input.time[data.input.time.length - 1] + (pt * step) + (i * step);
+        data.prediction[0].y[pt] = predictions[i] - correction;
       }
       last.push(...predictions);
       last.splice(0, predictions.length);
       pt += predictions.length;
     }
   }
-  Plotly.plot(document.getElementById('graph'), predictionData, chart.layout, chart.options);
+  Plotly.plot(document.getElementById('graph'), data.prediction, chart.layout, chart.options);
   const perc = Math.trunc(10000 * (correction / input[input.length - 1])) / 100;
-  advice(ok(Math.abs(perc) < 20), `Predict correction to SMA: ${perc}%`);
+  if (perc !== 0) advice(ok(Math.abs(perc) < 20), `Predict correction to SMA: ${perc}%`);
+}
+
+async function loadModel() {
+  const fileEl = document.getElementById('load');
+
+  async function handleFiles() {
+    fileEl.removeEventListener('change', handleFiles);
+    if (this.files.length !== 1) return;
+    const content = await this.files[0].text();
+    data = JSON.parse(content);
+    log('Loaded file', this.files[0].name, data.timestamp, data.notes);
+
+    if (data.stock) stock = data.stock;
+    // eslint-disable-next-line no-use-before-define
+    await createMenu();
+    if (data.stats.params) params = data.stats.params;
+    if (data.input) drawGraph();
+    if (data.validation) Plotly.plot(document.getElementById('graph'), data.validation, chart.layout, chart.options);
+    if (data.prediction) Plotly.plot(document.getElementById('graph'), data.prediction, chart.layout, chart.options);
+    if (data.notes) document.getElementById('notes').value = data.notes;
+
+    advice('');
+    advice(ok(data.input.adjusted && data.input.adjusted.length > 0), `Loaded data: ${data.input.type}: ${data.input.exchange}/${data.input.symbol} [${data.input.range}/${data.input.granularity}]`);
+    advice('Model created', data.timestamp);
+    advice('Parameters', params);
+    advice(ok(data.stats.loss < params.targetLoss), `Training loss: ${data.stats.loss}`);
+    advice(ok(data.stats.eval < params.evalError), `Model evaluation: ${data.stats.eval}% error`);
+  }
+
+  fileEl.addEventListener('change', handleFiles, false);
+  fileEl.click();
+}
+
+async function saveModel() {
+  data.stats = model.stats;
+  data.stock = stock;
+  data.timestamp = new Date();
+  data.notes = document.getElementById('notes').value;
+  const dt = new Date();
+  const fileName = `${stock.symbol.toUpperCase()}-${dt.getFullYear()}-${(dt.getMonth() + 1).toString().padStart(2, '0')}-${dt.getDate().toString().padStart(2, '0')}.json`;
+  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data, null, 2));
+  const div = document.createElement('a');
+  div.setAttribute('href', dataStr);
+  div.setAttribute('download', fileName);
+  // document.body.appendChild(downloadAnchorNode); // required for firefox
+  div.click();
+  div.remove();
+  log('Saved file', fileName);
 }
 
 async function initTFJS() {
@@ -397,6 +446,7 @@ async function initTFJS() {
 
 async function createMenu() {
   const div = document.getElementById('params');
+  if (div.childNodes.length > 0) div.innerHTML = '';
   const box = div.getBoundingClientRect();
 
   const menu1 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left}px` });
@@ -419,22 +469,10 @@ async function createMenu() {
   menu1.addList('Interval', ['1m', '15m', '30m', '1h', '1d', '1wk', '1mo'], stock.interval, (val) => stock.interval = val);
   menu1.addList('Range', ['1d', '5d', '1mo', '3mo', '1y', '2y'], stock.range, (val) => stock.range = val);
   menu1.addHTML('<hr>');
-  menu1.addButton('Run Inference', 'Run Inference', async () => {
-    if (!data || !data.adjusted) return;
-    await predictModel(data.adjusted, 'Predict');
-    // await predictModel(data.open, 'Predict: Open');
-    // await predictModel(data.high, 'Predict: High');
-    // await predictModel(data.low, 'Predict: Low');
-    // await predictModel(data.close, 'Predict: Close');
-  });
-  menu1.addRange('Predict window', params, 'predictWindow', 1, 100, 1, (val) => params.predictWindow = parseInt(val));
 
-  const menu2 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 210}px` });
-  menu2.addButton('Train Model', 'Train Model', async () => {
-    if (!data || !data.adjusted) return;
-    await trainModel(data.adjusted);
-    await validateModel(data.adjusted, 'Fit');
-  });
+  const menu2 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 170}px` });
+  menu2.addLabel('Model definition');
+  menu2.addHTML('<hr>');
   menu2.addRange('Input window', params, 'inputWindow', 1, 100, 1, (val) => params.inputWindow = parseInt(val));
   menu2.addRange('Output window', params, 'outputWindow', 1, 100, 1, (val) => params.outputWindow = parseInt(val));
   menu2.addHTML('<hr>');
@@ -447,15 +485,8 @@ async function createMenu() {
   menu2.addRange('Target loss', params, 'targetLoss', 0.01, 1, 0.1, (val) => params.targetLoss = parseFloat(val));
   menu2.addRange('Max eval error', params, 'evalError', 0.1, 10, 0.1, (val) => params.evalError = parseFloat(val));
   menu2.addRange('Discard threshold', params, 'smaError', 0.1, 10, 0.1, (val) => params.smaError = parseFloat(val));
-  menu2.addHTML('<hr>');
-  menu2.addBool('Show visor', params, 'visor', (val) => {
-    params.visor = val;
-    if (params.visor) tfvis.visor().open();
-    else tfvis.visor().close();
-    document.getElementsByClassName('visor')[0].style.visibility = params.visor ? 'visible' : 'hidden';
-  });
 
-  const menu3 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 430}px` });
+  const menu3 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 390}px` });
   menu3.addLabel('Model definition');
   menu3.addHTML('<hr>');
   menu3.addRange('Shape neurons', params, 'neurons', 1, 100, 1, (val) => params.neurons = parseInt(val));
@@ -465,18 +496,46 @@ async function createMenu() {
   menu3.addList('Cell type', ['lstmCell', 'gruCell'], params.cells, (val) => params.cells = val);
   menu3.addHTML('<hr>');
   menu3.addList('Kernel initializer', ['glorotNormal', 'heNormal', 'leCunNormal', 'ones', 'randomNormal', 'zeros'], params.kernelInitializer, (val) => params.kernelInitializer = val);
-  menu3.addList('Activation', ['elu', 'hardSigmoid', 'linear', 'relu', 'relu6', 'selu', 'sigmoid', 'softmax', 'softplus', 'softsign', 'tanh'], params.activation, (val) => params.activation = val);
+  menu3.addList('Initial activation', ['elu', 'hardSigmoid', 'linear', 'relu', 'relu6', 'selu', 'sigmoid', 'softmax', 'softplus', 'softsign', 'tanh'], params.activation, (val) => params.activation = val);
   menu3.addList('Recurrent activation', ['elu', 'hardSigmoid', 'linear', 'relu', 'relu6', 'selu', 'sigmoid', 'softmax', 'softplus', 'softsign', 'tanh'], params.recurrentActivation, (val) => params.recurrentActivation = val);
   menu3.addHTML('<hr>');
   menu3.addBool('Forget bias', params, 'forgetBias', (val) => params.forgetBias = val);
   menu3.addList('Bias initializer', ['glorotNormal', 'heNormal', 'leCunNormal', 'ones', 'randomNormal', 'zeros'], params.biasInitializer, (val) => params.biasInitializer = val);
   menu3.addBool('Shuffle data', params, 'shuffle', (val) => params.shuffle = val);
 
+  const menu4 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 650}px` });
+  menu4.addButton('Load Model', 'Load Model', () => loadModel());
+  menu4.addButton('Save Model', 'Save Model', () => saveModel());
+  menu4.addHTML('<hr>');
+  menu4.addButton('Run Training', 'Train Model', async () => {
+    if (!data || !data.input.adjusted) return;
+    await trainModel(data.input.adjusted);
+    await validateModel(data.input.adjusted, 'Fit');
+  });
+  menu4.addBool('Show visor', params, 'visor', (val) => {
+    params.visor = val;
+    if (params.visor) tfvis.visor().open();
+    else tfvis.visor().close();
+    document.getElementsByClassName('visor')[0].style.visibility = params.visor ? 'visible' : 'hidden';
+  });
+  menu4.addButton('Run Prediction', 'Run Inference', async () => {
+    if (!data || !data.input.adjusted) return;
+    await predictModel(data.input.adjusted, 'Predict');
+    // await predictModel(data.input.open, 'Predict: Open');
+    // await predictModel(data.input.high, 'Predict: High');
+    // await predictModel(data.input.low, 'Predict: Low');
+    // await predictModel(data.input.close, 'Predict: Close');
+  });
+  menu4.addRange('Predict window', params, 'predictWindow', 1, 100, 1, (val) => params.predictWindow = parseInt(val));
+  menu4.addHTML('<hr>');
+  menu4.addLabel('Notes');
+  menu4.addHTML('<textarea id="notes" style="width: 100%; height: 8rem; background: #444444; color: white;"></textarea>');
+
   document.getElementById('advice').addEventListener('click', () => {
     delete model.stats.epoch;
     delete model.stats.history;
     delete model.stats.acc;
-    delete model.stats.validationData;
+    delete model.stats.data.prediction;
     navigator.clipboard.writeText(JSON.stringify({ ...stock, ...model.stats }, null, 2));
   });
 }
@@ -486,9 +545,9 @@ async function main() {
   await createMenu();
   await initTFJS();
   await getData();
-  // await trainModel(data.adjusted);
-  // await validateModel(data.adjusted, 'Fit:');
-  // await predictModel(data.adjusted, 'Predict');
+  // await trainModel(data.input.adjusted);
+  // await validateModel(data.input.adjusted, 'Fit:');
+  // await predictModel(data.input.adjusted, 'Predict');
 }
 
 window.onload = main;
