@@ -9,9 +9,9 @@ import Menu from './menu.js';
 let data = { input: [], validation: [], prediction: [], stats: {} };
 
 let stock = {
-  symbol: 'dell',
+  symbol: 'btc-usd',
   interval: '1d',
-  range: '2y',
+  range: '1y',
 };
 
 let params = {
@@ -482,9 +482,9 @@ async function createMenu() {
   menu2.addList('Optimizer', ['sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'], params.optimizer, (val) => params.optimizer = val);
   menu2.addRange('Learning rate', params, 'learningRate', 0.001, 1, 0.001, (val) => params.learningRate = parseFloat(val));
   menu2.addHTML('<hr>');
-  menu2.addRange('Target loss', params, 'targetLoss', 0.01, 1, 0.1, (val) => params.targetLoss = parseFloat(val));
-  menu2.addRange('Max eval error', params, 'evalError', 0.1, 10, 0.1, (val) => params.evalError = parseFloat(val));
-  menu2.addRange('Discard threshold', params, 'smaError', 0.1, 10, 0.1, (val) => params.smaError = parseFloat(val));
+  menu2.addRange('Target loss', params, 'targetLoss', 0.01, 1, 0.01, (val) => params.targetLoss = parseFloat(val));
+  menu2.addRange('Max eval error', params, 'evalError', 0.01, 10, 0.01, (val) => params.evalError = parseFloat(val));
+  menu2.addRange('Discard threshold', params, 'smaError', 0.01, 10, 0.01, (val) => params.smaError = parseFloat(val));
 
   const menu3 = new Menu(div, '', { top: `${box.top}px`, left: `${box.left + 390}px` });
   menu3.addLabel('Model definition');

@@ -3,8 +3,8 @@
 // import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
 
 const int = 255;
-const sub = 0.5;
-const mul = 1.5;
+const sub = 0.5; // 0;
+const mul = 1.5; // 0.75;
 
 let model;
 let stats;
@@ -12,7 +12,14 @@ let stats;
 async function create(params) {
   // eslint-disable-next-line no-console
   console.log('Model create:', params);
-  model = tf.sequential();
+
+  if (model) {
+    model.layers.forEach((layer) => layer.dispose);
+    model.optimizer.dispose();
+    model.dispose();
+  }
+  await tf.engine().startScope();
+  model = tf.sequential({ name: 'sequentialStocks' });
 
   // model definition
   model.add(tf.layers.dense({ // https://js.tensorflow.org/api/latest/#layers.dense
@@ -40,13 +47,13 @@ async function create(params) {
       name: `cell${params.cells}${index}`,
       trainable: true,
       dtype: params.dtype || 'float32',
-      recurrentActivation: params.recurrentActivation || 'hardSigmoid',
       units: params.neurons,
 
       activation: params.activation || 'tanh',
       kernelInitializer: params.kernelInitializer || 'glorotNormal',
       kernelConstraint: params.constraint,
       recurrentInitializer: params.kernelInitializer || 'glorotNormal',
+      recurrentActivation: params.recurrentActivation || 'hardSigmoid',
       recurrentConstraint: params.constraint,
       biasInitializer: params.biasInitializer || 'glorotNormal',
       biasConstraint: params.constraint,
@@ -84,12 +91,14 @@ async function create(params) {
     loss: params.loss || 'meanSquaredError',
     metrics: ['accuracy'],
   });
+  await tf.engine().endScope();
 }
 
 async function train(input, output, params, callback) {
   // if (!model) await create(params);
   await create(params);
 
+  await tf.engine().startScope();
   // normalize inputs
   const max = Math.max(...output);
   const min = Math.min(...output);
@@ -100,7 +109,8 @@ async function train(input, output, params, callback) {
     ? tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).mul(int).div(max - min).toInt())
     : tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).div(max - min).sub(sub).mul(mul));
 
-  if (tfvis) tfvis.show.valuesDistribution({ name: 'Data Distribution', tab: 'Visor' }, outputT);
+  if (tfvis) tfvis.show.valuesDistribution({ name: 'Input Data Distribution', tab: 'Visor' }, inputT);
+  if (tfvis) tfvis.show.valuesDistribution({ name: 'Output Data Distribution', tab: 'Visor' }, outputT);
 
   const batchLogs = [];
   function visorPlot(batch, logs) {
@@ -112,7 +122,6 @@ async function train(input, output, params, callback) {
 
   // used by fit callback
   function fitEpochCallback(epoch, logs) {
-    // if (epoch === 2) model.stopTraining = true;
     const loss = Math.trunc(1000 * Math.sqrt(logs.loss) / (params.dtype === 'int32' ? int : 1)) / 1000;
     if (loss < params.targetLoss) {
       model.stopTraining = true;
@@ -149,9 +158,11 @@ async function train(input, output, params, callback) {
     evaluateT[0].dispose();
     evaluateT[1].dispose();
   }
+  await tf.engine().endScope();
 }
 
 async function predict(input) {
+  await tf.engine().startScope();
   if (!stats || !stats.params) return null;
   const inputT = stats.params.dtype === 'int32'
     ? tf.tidy(() => tf.tensor2d(input, [1, input.length]).sub(stats.min).mul(int).div(stats.max - stats.min).toInt())
@@ -164,6 +175,7 @@ async function predict(input) {
   inputT.dispose();
   normalizeT.dispose();
   outputT.dispose();
+  await tf.engine().endScope();
   return output;
 }
 
