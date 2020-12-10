@@ -17,27 +17,27 @@ let stock = {
 let params = {
   backend: 'webgl',
   dtype: 'float32',
-  evalError: 2.5,
+  evalError: 0.1,
   smaError: 2.5,
   visor: false,
 
-  inputWindow: 60,
+  inputWindow: 44,
   outputWindow: 1,
-  predictWindow: 60,
+  predictWindow: 44,
   epochs: 25,
-  validationSplit: 0.2,
+  validationSplit: 0,
   optimizer: 'adam',
-  learningRate: 0.005,
+  learningRate: 0.001,
   loss: 'meanSquaredError',
-  targetLoss: 0.1,
+  targetLoss: 0.03,
 
-  neurons: 60,
-  features: 10,
-  layers: 1,
+  neurons: 88,
+  features: 4,
+  layers: 3,
   cells: 'lstmCell',
   kernelInitializer: 'leCunNormal',
-  activation: 'relu',
-  recurrentActivation: 'hardSigmoid',
+  activation: 'sigmoid',
+  recurrentActivation: 'tanh',
   // constraint: 'unitNorm',
 
   forgetBias: false,
@@ -477,7 +477,7 @@ async function createMenu() {
   menu2.addRange('Output window', params, 'outputWindow', 1, 100, 1, (val) => params.outputWindow = parseInt(val));
   menu2.addHTML('<hr>');
   menu2.addRange('Training epochs', params, 'epochs', 1, 50, 1, (val) => params.epochs = parseInt(val));
-  menu2.addRange('Validation split', params, 'validationSplit', 0.1, 0.9, 0.1, (val) => params.validationSplit = parseFloat(val));
+  menu2.addRange('Validation split', params, 'validationSplit', 0.0, 0.9, 0.05, (val) => params.validationSplit = parseFloat(val));
   menu2.addHTML('<hr>');
   menu2.addList('Optimizer', ['sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'], params.optimizer, (val) => params.optimizer = val);
   menu2.addRange('Learning rate', params, 'learningRate', 0.001, 1, 0.001, (val) => params.learningRate = parseFloat(val));

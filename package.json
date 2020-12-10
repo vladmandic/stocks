@@ -1,21 +1,21 @@
 {
-  "name": "@vladmandic/lstm",
+  "name": "@vladmandic/stocks",
   "version": "0.0.2",
   "description": "Time series analysis using machine learning",
   "sideEffects": false,
   "main": "dist/index.js",
   "author": "Vladimir Mandic <mandic00@live.com>",
   "bugs": {
-    "url": "https://github.com/vladmandic/lstm/issues"
+    "url": "https://github.com/vladmandic/stocks/issues"
   },
-  "homepage": "https://github.com/vladmandic/lstm#readme",
+  "homepage": "https://github.com/vladmandic/stocks#readme",
   "license": "MIT",
   "engines": {
     "node": ">=14.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vladmandic/lstm.git"
+    "url": "git+https://github.com/vladmandic/stocks.git"
   },
   "dependencies": {
     "@tensorflow/tfjs-vis": "^1.4.3",
@@ -33,15 +33,15 @@
     "@tensorflow/tfjs-layers": "^2.7.0",
     "@vladmandic/pilogger": "^0.2.9",
     "chokidar": "^3.4.3",
-    "dayjs": "^1.9.6",
-    "esbuild": "^0.8.17",
-    "eslint": "^7.14.0",
+    "dayjs": "^1.9.7",
+    "esbuild": "^0.8.21",
+    "eslint": "^7.15.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-json": "^2.1.2",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.2.1",
-    "plotly.js-dist": "^1.57.1",
+    "plotly.js-dist": "^1.58.2",
     "rimraf": "^3.0.2",
     "seedrandom": "^3.0.5"
   },
@@ -53,8 +53,6 @@
     "tensorflowjs",
     "stockmarket",
     "time-series",
-    "lstm",
-    "gru",
-    "rnn"
+    "stocks"
   ]
 }

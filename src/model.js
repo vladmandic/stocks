@@ -3,21 +3,40 @@
 // import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
 
 const int = 255;
-const sub = 0.5; // 0;
-const mul = 1.5; // 0.75;
+const sub = 0; // 0.5;
+const mul = 0.75; // 1.5;
 
 let model;
 let stats;
 
-async function create(params) {
-  // eslint-disable-next-line no-console
-  console.log('Model create:', params);
-
+async function dispose() {
   if (model) {
     model.layers.forEach((layer) => layer.dispose);
-    model.optimizer.dispose();
+    model.weights.forEach((weight) => weight.dispose);
+    if (model.optimizer) model.optimizer.dispose();
     model.dispose();
   }
+}
+
+async function createCNN(params) { // concept based on <https://www.hindawi.com/journals/complexity/2020/6622927/>
+  // eslint-disable-next-line no-console
+  console.log('Model create CNN:', params);
+
+  // console.log('Create start', tf.engine().memory().numTensors);
+  await tf.engine().startScope();
+  model = tf.sequential({ name: 'sequentialStocks' });
+
+  // TBD
+
+  await tf.engine().endScope();
+  // console.log('Create end', tf.engine().memory().numTensors);
+}
+
+async function createRNN(params) { // concept based on <https://www.codeproject.com/Articles/1265477/TensorFlow-js-Predicting-Time-Series-Using-Recurre>
+  // eslint-disable-next-line no-console
+  console.log('Model create RNN:', params);
+
+  // console.log('Create start', tf.engine().memory().numTensors);
   await tf.engine().startScope();
   model = tf.sequential({ name: 'sequentialStocks' });
 
@@ -92,12 +111,15 @@ async function create(params) {
     metrics: ['accuracy'],
   });
   await tf.engine().endScope();
+  // console.log('Create end', tf.engine().memory().numTensors);
 }
 
 async function train(input, output, params, callback) {
   // if (!model) await create(params);
-  await create(params);
+  await dispose();
+  await createRNN(params);
 
+  // console.log('Normalize start', tf.engine().memory().numTensors);
   await tf.engine().startScope();
   // normalize inputs
   const max = Math.max(...output);
@@ -108,9 +130,10 @@ async function train(input, output, params, callback) {
   const outputT = params.dtype === 'int32'
     ? tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).mul(int).div(max - min).toInt())
     : tf.tidy(() => tf.tensor2d(output, [output.length, params.outputWindow]).sub(min).div(max - min).sub(sub).mul(mul));
+  // console.log('Normalize end', tf.engine().memory().numTensors);
 
-  if (tfvis) tfvis.show.valuesDistribution({ name: 'Input Data Distribution', tab: 'Visor' }, inputT);
-  if (tfvis) tfvis.show.valuesDistribution({ name: 'Output Data Distribution', tab: 'Visor' }, outputT);
+  if (tfvis && params.visor) tfvis.show.valuesDistribution({ name: 'Input Data Distribution', tab: 'Visor' }, inputT);
+  if (tfvis && params.visor) tfvis.show.valuesDistribution({ name: 'Output Data Distribution', tab: 'Visor' }, outputT);
 
   const batchLogs = [];
   function visorPlot(batch, logs) {
@@ -130,25 +153,25 @@ async function train(input, output, params, callback) {
       callback(epoch, loss);
     }
   }
-
   // execute fit with callback
+  // console.log('Fit start', tf.engine().memory().numTensors);
   stats = await model.fit(inputT, outputT, // https://js.tensorflow.org/api/latest/#tf.LayersModel.fit
     { batchSize: params.inputWindow,
       epochs: params.epochs,
       validationSplit: params.validationSplit,
       shuffle: params.shuffle || false,
-      // callbacks: tfvis.show.fitCallbacks({ name: 'Training Chart', tab: 'Visor' }, ['loss', 'acc']),
-      // callbacks: tf.callbacks.earlyStopping({monitor: 'val_acc'})
       callbacks: {
         onBatchEnd: (batch, logs) => visorPlot(batch, logs),
         onEpochEnd: (epoch, logs) => fitEpochCallback(epoch, logs),
       },
     });
+  // console.log('Fit end', tf.engine().memory().numTensors);
   stats.params = params;
   stats.max = Math.trunc(10000 * max) / 10000;
   stats.min = Math.trunc(10000 * min) / 10000;
   stats.length = output.length;
 
+  // console.log('Eval start', tf.engine().memory().numTensors);
   const evaluateT = model.evaluate(inputT, outputT, { batchSize: params.inputWindow });
   inputT.dispose();
   outputT.dispose();
@@ -159,9 +182,11 @@ async function train(input, output, params, callback) {
     evaluateT[1].dispose();
   }
   await tf.engine().endScope();
+  // console.log('Eval end', tf.engine().memory().numTensors);
 }
 
 async function predict(input) {
+  // console.log('Predict start', tf.engine().memory().numTensors);
   await tf.engine().startScope();
   if (!stats || !stats.params) return null;
   const inputT = stats.params.dtype === 'int32'
@@ -176,7 +201,8 @@ async function predict(input) {
   normalizeT.dispose();
   outputT.dispose();
   await tf.engine().endScope();
+  // console.log('Predict end', tf.engine().memory().numTensors);
   return output;
 }
 
-export { create, train, predict, model, stats };
+export { train, predict, model, stats };
