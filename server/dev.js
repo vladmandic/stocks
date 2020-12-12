@@ -12,6 +12,7 @@
 const process = require('process');
 const fs = require('fs');
 const zlib = require('zlib');
+const http = require('http');
 const http2 = require('http2');
 const path = require('path');
 const chokidar = require('chokidar');
@@ -29,7 +30,8 @@ const options = {
   cert: fs.readFileSync('server/https.crt'),
   root: '..',
   default: 'src/index.html',
-  port: 8000,
+  httpPort: 10040,
+  httpsPort: 10041,
   monitor: ['package.json', 'src'],
 };
 
@@ -140,9 +142,12 @@ async function httpRequest(req, res) {
 async function main() {
   log.header();
   await watch();
-  const server = http2.createSecureServer(options, httpRequest);
-  server.on('listening', () => log.state('HTTP2 server listening:', options.port));
-  server.listen(options.port);
+  const server1 = http.createServer(options, httpRequest);
+  server1.on('listening', () => log.state('HTTP server listening:', options.httpPort));
+  server1.listen(options.httpPort);
+  const server2 = http2.createSecureServer(options, httpRequest);
+  server2.on('listening', () => log.state('HTTP2 server listening:', options.httpsPort));
+  server2.listen(options.httpsPort);
   await build.build('all', 'startup');
 }
 
