@@ -194,7 +194,7 @@ async function drawGraph() {
 
 async function getData() {
   const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURI(stock.symbol)}?range=${stock.range}&interval=${stock.interval}&indicators=quote&includeTimestamps=true&includePrePost=true`;
-  const res = await fetch('https://localhost:8000/cors', { headers: { cors: url } });
+  const res = await fetch(`${location.href}cors`, { headers: { cors: url } });
   const json = (res && res.ok) ? await res.json() : {};
   if (!json.chart || !json.chart.result) {
     log('data error:', stock.symbol);
