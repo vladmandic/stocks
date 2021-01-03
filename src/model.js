@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* global tf, tfvis */
 
 // import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* global tf, tfvis, Plotly */
 
 // import Plotly from 'plotly.js-dist'; // <https://plotly.com/javascript/>
@@ -129,13 +130,13 @@ function log(...msg) {
   const ts = `${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}:${dt.getSeconds().toString().padStart(2, '0')}.${dt.getMilliseconds().toString().padStart(3, '0')}`;
   // eslint-disable-next-line no-console
   console.log(ts, ...msg);
-  const div = document.getElementById('log');
+  const div = document.getElementById('log') || document.createElement('div');
   div.innerHTML += `<font color=gray>${ts}</font> &nbsp ${str(msg)}<br>`;
   div.scrollTop = div.scrollHeight;
 }
 
 function advice(...msg) {
-  const div = document.getElementById('advice');
+  const div = document.getElementById('advice') || document.createElement('div');
   div.innerHTML += `${str(msg)}<br>`;
   div.scrollTop = div.scrollHeight;
 }
