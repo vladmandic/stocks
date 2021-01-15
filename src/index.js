@@ -425,7 +425,7 @@ async function saveModel() {
 }
 
 async function initTFJS() {
-  await wasm.setWasmPaths('../assets/');
+  await wasm.setWasmPaths('../node_modules/@tensorflow/tfjs-backend-wasm/dist/');
   await tf.setBackend(params.backend);
   await tf.enableProdMode();
   if (tf.getBackend() === 'webgl') {
