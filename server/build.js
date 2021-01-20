@@ -8,7 +8,8 @@ const log = require('@vladmandic/pilogger');
 let es;
 const banner = `
   /*
-  homepage: <https://github.com/vladmandic/lstm>
+  Time Series Analysis
+  homepage: <https://github.com/vladmandic/stocks>
   author: <https://github.com/vladmandic>'
   */
 `;
@@ -16,9 +17,9 @@ const banner = `
 // common configuration
 const common = {
   banner,
-  minifyWhitespace: true, // this one is ok
-  minifyIdentifiers: false, // this requires tfjs 2.8.1 to function
-  minifySyntax: false, // this breaks with tfjs 2.8.4
+  minifyWhitespace: true,
+  minifyIdentifiers: true,
+  minifySyntax: true,
   bundle: true,
   sourcemap: true,
   logLevel: 'error',
