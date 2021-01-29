@@ -1,6 +1,6 @@
 {
   "name": "@vladmandic/stocks",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Time series analysis using machine learning",
   "sideEffects": false,
   "main": "dist/index.js",
