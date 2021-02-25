@@ -1,7 +1,9 @@
 // @ts-nocheck
-/* global tf, tfvis */
+/* global tfvis */
 
-// import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
+import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
+// import * as tfgl from '@tensorflow/tfjs-backend-webgl';
+// import * as wasm from '@tensorflow/tfjs-backend-wasm';
 
 const int = 255;
 const sub = 0; // 0.5;

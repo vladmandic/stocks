@@ -9,7 +9,6 @@
   - passthrough data compression
 */
 
-const process = require('process');
 const fs = require('fs');
 const zlib = require('zlib');
 const http = require('http');
@@ -37,10 +36,10 @@ const options = {
 
 // just some predefined mime types
 const mime = {
-  '.html': 'text/html',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpg',
   '.gif': 'image/gif',
@@ -48,8 +47,9 @@ const mime = {
   '.svg': 'image/svg+xml',
   '.wav': 'audio/wav',
   '.mp4': 'video/mp4',
-  '.woff': 'application/font-woff',
-  '.ttf': 'application/font-ttf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
   '.wasm': 'application/wasm',
 };
 
@@ -84,6 +84,7 @@ function handle(url) {
     if (obj.stat.isFile()) obj.ok = true;
     if (!obj.ok && obj.stat.isDirectory()) {
       obj.file = path.join(obj.file, options.default);
+      // @ts-ignore
       obj = handle(obj.file);
     }
     resolve(obj);
@@ -103,9 +104,9 @@ async function httpRequest(req, res) {
     log.data(`${req.method}/${req.httpVersion}`, result.status, 'cors', serialize.length, url, ip);
     res.writeHead(200, {
       'Content-Language': 'en',
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'no-cache',
-      'X-Powered-By': `NodeJS/${process.version}`,
+      'X-Content-Type-Options': 'nosniff',
     });
     res.write(serialize);
     res.end();
@@ -126,7 +127,7 @@ async function httpRequest(req, res) {
           'Content-Encoding': accept ? 'br' : '',
           'Last-Modified': result.stat.mtime,
           'Cache-Control': 'no-cache',
-          'X-Powered-By': `NodeJS/${process.version}`,
+          'X-Content-Type-Options': 'nosniff',
         });
         log.data(`${req.method}/${req.httpVersion}`, res.statusCode, contentType, result.stat.size, req.url, ip);
         const compress = zlib.createBrotliCompress({ params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } }); // instance of brotli compression with level 5
@@ -142,6 +143,7 @@ async function httpRequest(req, res) {
 async function main() {
   log.header();
   await watch();
+  // @ts-ignore
   const server1 = http.createServer(options, httpRequest);
   server1.on('listening', () => log.state('HTTP server listening:', options.httpPort));
   server1.listen(options.httpPort);

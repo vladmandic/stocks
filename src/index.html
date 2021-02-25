@@ -1,22 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="utf-8">
   <title>Stocks</title>
   <meta http-equiv="content-type">
   <meta content="text/html">
-  <meta charset="UTF-8">
   <meta name="description" content="Stocks; Author: Vladimir Mandic <https://github.com/vladmandic>">
-  <meta name="viewport" content="width=device-width, initial-scale=0.6, minimum-scale=0.3, maximum-scale=3.0, shrink-to-fit=yes, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=yes">
   <meta name="theme-color" content="#000000"/>
   <meta name="application-name" content="Stocks">
   <meta name="msapplication-tooltip" content="Stocks">
-  <link rel="manifest" href="../manifest.json">
+  <link rel="manifest" href="../manifest.webmanifest">
   <link rel="shortcut icon" href="../favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="../assets/icon.png">
-  <script src="../node_modules/@tensorflow/tfjs/dist/tf.es2017.js"></script>
+  <!-- <script src="../node_modules/@tensorflow/tfjs/dist/tf.es2017.js"></script> -->
   <script src="../node_modules/@tensorflow/tfjs-vis/dist/tfjs-vis.umd.min.js"></script>
   <script src="../node_modules/plotly.js-dist/plotly.js"></script>
-  <script src="../dist/index.js"></script>
+  <script src="../dist/index.js" type="module"></script>
   <style>
     /* @font-face { font-family: 'FA'; font-display: swap; font-style: normal; font-weight: 900; src: local('FA'), url('../assets/fa-solid-900.woff2'); } */
     html { font-family: 'system-ui'; font-size: 14px; }
@@ -24,7 +24,7 @@
     hr { width: 100%; }
     ::-webkit-scrollbar { width: 1rem; }
     ::-webkit-scrollbar-thumb { background: lightblue; }
-    .visor { background: gray; color: black; font-family: 'system-ui'; min-width: fit-content; }
+    .visor { background: gray; color: black; font-family: 'system-ui'; min-width: fit-content }
     .visor-controls { display: none; };
     .visor-tabs { background: gray; };
   </style>

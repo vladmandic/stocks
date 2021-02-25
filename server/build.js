@@ -17,9 +17,9 @@ const banner = `
 // common configuration
 const common = {
   banner,
-  minifyWhitespace: true,
-  minifyIdentifiers: true,
-  minifySyntax: true,
+  minifyWhitespace: false,
+  minifyIdentifiers: false,
+  minifySyntax: false,
   bundle: true,
   sourcemap: true,
   logLevel: 'error',
@@ -34,7 +34,7 @@ const targets = {
       metafile: 'dist/index.json',
       entryPoints: ['src/index.js'],
       outfile: 'dist/index.js',
-      external: ['fs', 'buffer', 'util'],
+      external: ['fs', 'buffer', 'util', 'os'],
     },
   },
 };

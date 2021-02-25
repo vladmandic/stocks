@@ -1,16 +1,18 @@
 // @ts-nocheck
-/* global tf, tfvis, Plotly */
+/* global Plotly, tfvis */
 
 // import Plotly from 'plotly.js-dist'; // <https://plotly.com/javascript/>
-// import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
+import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
+// import * as tfgl from '@tensorflow/tfjs-backend-webgl';
 import * as wasm from '@tensorflow/tfjs-backend-wasm';
+// import * as tfvis from '@tensorflow/tfjs-vis/dist/tfjs-vis.umd.min.js';
 import * as model from './model.js';
 import Menu from './menu.js';
 
 let data = { input: [], validation: [], prediction: [], stats: {} };
 
 let stock = {
-  symbol: 'btc-usd',
+  symbol: 'dell',
   interval: '1d',
   range: '1y',
 };
@@ -34,7 +36,7 @@ let params = {
 
   neurons: 88,
   features: 4,
-  layers: 3,
+  layers: 1,
   cells: 'lstmCell',
   kernelInitializer: 'leCunNormal',
   activation: 'sigmoid',
@@ -425,13 +427,14 @@ async function saveModel() {
 }
 
 async function initTFJS() {
-  await wasm.setWasmPaths('../node_modules/@tensorflow/tfjs-backend-wasm/dist/');
+  // const wasm = null;
+  if (wasm) await wasm.setWasmPaths('../node_modules/@tensorflow/tfjs-backend-wasm/dist/');
   await tf.setBackend(params.backend);
   await tf.enableProdMode();
   if (tf.getBackend() === 'webgl') {
     // tf.ENV.set('WEBGL_DELETE_TEXTURE_THRESHOLD', 0);
     // tf.ENV.set('WEBGL_FORCE_F16_TEXTURES', false);
-    tf.ENV.set('WEBGL_PACK_DEPTHWISECONV', true);
+    // tf.ENV.set('WEBGL_PACK_DEPTHWISECONV', true);
     const gl = await tf.backend().getGPGPUContext().gl;
     log(`TFJS version: ${tf.version_core} backend: ${tf.getBackend().toUpperCase()} version: ${gl.getParameter(gl.VERSION)} renderer: ${gl.getParameter(gl.RENDERER)}`);
   } else if (tf.getBackend() === 'wasm') {
