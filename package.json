@@ -19,13 +19,15 @@
   },
   "dependencies": {
     "@tensorflow/tfjs-vis": "^1.5.0",
-    "node-fetch": "^3.0.0-beta.9"
+    "node-fetch": "^3.0.0-beta.9",
+    "plotly.js-dist": "^1.58.4",
+    "vega-loader": "^4.4.0"
   },
   "peerDependencies": {},
   "devDependencies": {
-    "@tensorflow/tfjs": "=3.0.0",
-    "@tensorflow/tfjs-backend-wasm": "=3.0.0",
-    "@tensorflow/tfjs-backend-webgl": "=3.0.0",
+    "@tensorflow/tfjs": "^3.2.0",
+    "@tensorflow/tfjs-backend-wasm": "^3.2.0",
+    "@tensorflow/tfjs-backend-webgl": "^3.2.0",
     "@vladmandic/pilogger": "^0.2.14",
     "chokidar": "^3.5.1",
     "dayjs": "^1.10.4",
@@ -36,7 +38,6 @@
     "eslint-plugin-json": "^2.1.2",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.3.1",
-    "plotly.js-dist": "^1.58",
     "rimraf": "^3.0.2",
     "seedrandom": "^3.0.5"
   },

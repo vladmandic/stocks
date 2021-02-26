@@ -1,11 +1,11 @@
 // @ts-nocheck
-/* global Plotly, tfvis */
 
-// import Plotly from 'plotly.js-dist'; // <https://plotly.com/javascript/>
+/* global Plotly */
+
+// import Plotly from 'plotly.js/src/lib/index'; // <https://plotly.com/javascript/>
 import * as tf from '@tensorflow/tfjs'; // <https://js.tensorflow.org/api/latest/>
-// import * as tfgl from '@tensorflow/tfjs-backend-webgl';
 import * as wasm from '@tensorflow/tfjs-backend-wasm';
-// import * as tfvis from '@tensorflow/tfjs-vis/dist/tfjs-vis.umd.min.js';
+import * as tfvis from '../assets/tfjs-vis.esm';
 import * as model from './model.js';
 import Menu from './menu.js';
 
