@@ -1,21 +1,19 @@
 #!/usr/bin/env -S node --trace-warnings
 
-const fs = require('fs');
 const esbuild = require('esbuild');
 const log = require('@vladmandic/pilogger');
 
 // keeps esbuild service instance cached
-let es;
-const banner = `
+const banner = { js: `
   /*
   Time Series Analysis
   homepage: <https://github.com/vladmandic/stocks>
   author: <https://github.com/vladmandic>'
   */
-`;
+` };
 
 // common configuration
-const common = {
+const target = {
   banner,
   minifyWhitespace: false,
   minifyIdentifiers: false,
@@ -24,28 +22,18 @@ const common = {
   sourcemap: true,
   logLevel: 'error',
   target: 'es2018',
+  platform: 'browser',
+  format: 'esm',
+  metafile: true,
+  entryPoints: ['src/index.js'],
+  outfile: 'dist/index.js',
+  external: ['fs', 'buffer', 'util', 'os'],
 };
 
-const targets = {
-  browserBundle: {
-    index: {
-      platform: 'browser',
-      format: 'esm',
-      metafile: 'dist/index.json',
-      entryPoints: ['src/index.js'],
-      outfile: 'dist/index.js',
-      external: ['fs', 'buffer', 'util', 'os'],
-    },
-  },
-};
-
-async function getStats(metafile) {
+async function getStats(json) {
   const stats = {};
-  if (!fs.existsSync(metafile)) return stats;
-  const data = fs.readFileSync(metafile);
-  const json = JSON.parse(data.toString());
-  if (json && json.inputs && json.outputs) {
-    for (const [key, val] of Object.entries(json.inputs)) {
+  if (json && json.metafile?.inputs && json.metafile?.outputs) {
+    for (const [key, val] of Object.entries(json.metafile.inputs)) {
       if (key.startsWith('node_modules')) {
         stats.modules = (stats.modules || 0) + 1;
         stats.moduleBytes = (stats.moduleBytes || 0) + val.bytes;
@@ -55,7 +43,7 @@ async function getStats(metafile) {
       }
     }
     const files = [];
-    for (const [key, val] of Object.entries(json.outputs)) {
+    for (const [key, val] of Object.entries(json.metafile.outputs)) {
       if (!key.endsWith('.map')) {
         files.push(key);
         stats.outputBytes = (stats.outputBytes || 0) + val.bytes;
@@ -68,23 +56,13 @@ async function getStats(metafile) {
 
 // rebuild on file change
 async function build(f, msg) {
-  log.info('Build: file', msg, f, 'target:', common.target);
-  if (!es) es = await esbuild.startService();
-  // common build options
+  log.info('Build: file', msg, f);
   try {
-    // rebuild all target groups and types
-    for (const [targetGroupName, targetGroup] of Object.entries(targets)) {
-      for (const [targetName, targetOptions] of Object.entries(targetGroup)) {
-        // if triggered from watch mode, rebuild only browser bundle
-        if ((require.main !== module) && (targetGroupName !== 'browserBundle')) continue;
-        await es.build({ ...common, ...targetOptions });
-        const stats = await getStats(targetOptions.metafile);
-        log.state(`Build for: ${targetGroupName} type: ${targetName}:`, stats);
-      }
-    }
-    if (require.main === module) process.exit(0);
+    // @ts-ignore
+    const meta = await esbuild.build(target);
+    const stats = await getStats(meta);
+    log.state('Build stats:', stats);
   } catch (err) {
-    // catch errors and print where it occured
     log.error('Build error', JSON.stringify(err.errors || err, null, 2));
     if (require.main === module) process.exit(1);
   }
