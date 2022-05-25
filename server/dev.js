@@ -15,7 +15,7 @@ const http = require('http');
 const http2 = require('http2');
 const path = require('path');
 const chokidar = require('chokidar');
-const fetch = require('node-fetch');
+const superagent = require('superagent');
 const log = require('@vladmandic/pilogger');
 const build = require('./build.js');
 
@@ -98,8 +98,8 @@ async function httpRequest(req, res) {
   const ip = (Array.isArray(forwarded) ? forwarded[1] : null) || req.headers['x-forwarded-for'] || req.ip || req.socket.remoteAddress;
   if (req.url === '/cors') {
     const url = req.headers['cors'];
-    const result = await fetch(url);
-    const json = (result && result.ok) ? await result.json() : {};
+    const result = await superagent.get(url).set('Accept', 'application/json');
+    const json = (result && result.ok) ? await result.body : {};
     const serialize = JSON.stringify(json);
     log.data(`${req.method}/${req.httpVersion}`, result.status, 'cors', serialize.length, url, ip);
     res.writeHead(200, {
